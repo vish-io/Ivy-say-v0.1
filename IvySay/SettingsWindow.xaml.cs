@@ -28,13 +28,14 @@ public partial class SettingsWindow : Window
             Microphone.SelectedItem = selected;
         }
         Polish.IsChecked = preferences.Polish;
+        ShowComparison.IsChecked = preferences.ShowComparison;
         Shortcut.SelectedIndex = preferences.Shortcut switch { "CtrlShiftSpace" => 1, "AltShiftSpace" => 2, _ => 0 };
     }
     private void SavePreferences(object sender, RoutedEventArgs e)
     {
         try
         {
-            new Preferences { TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
+            new Preferences { TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
             MessageBox.Show("Preferences saved. Restart Ivy Say to apply shortcut changes.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }

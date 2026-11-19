@@ -37,6 +37,8 @@ public class GroqClientTests
             Assert.Contains("\"reasoning_format\":\"hidden\"", body);
             Assert.Contains("\"max_completion_tokens\":2048", body);
             Assert.Contains("Bullet buy milk", body);
+            Assert.Contains("self-corrections", body);
+            Assert.Contains("accent-related", body);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"- Buy milk\"}}]}", Encoding.UTF8, "application/json") };
         }));
         Assert.Equal("- Buy milk", await client.PolishAsync("Bullet buy milk", "test-key", CancellationToken.None));

@@ -78,7 +78,11 @@ public partial class MainWindow : Window
             byte[] wav = await current.StopAsync();
             var preferences = Preferences.Load();
             string key = KeyStore.Load();
+            var transcriptionTimer = Stopwatch.StartNew();
             string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, lifetime.Token);
+            transcriptionTimer.Stop();
+            TimeSpan? formattingTime = null;
+            string? polishedText = null;
             if (raw.Length == 0) { SetStatus("Nothing heard", "Try speaking a little louder"); return; }
             recoverableText = raw;
             if (preferences.Polish)
@@ -86,8 +90,12 @@ public partial class MainWindow : Window
                 SetStatus("Thinking…", "Polishing your words");
                 try
                 {
+                    var formattingTimer = Stopwatch.StartNew();
                     string polished = await groq.PolishAsync(raw, key, lifetime.Token);
+                    formattingTimer.Stop();
+                    formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
+                    polishedText = polished;
                     recoverableText = polished;
                 }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
@@ -113,7 +121,10 @@ public partial class MainWindow : Window
             Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl);
             recoverableText = null;
             if (formattingError != null) SetStatus("Raw transcript inserted", $"{formattingError} · formatting failed");
-            else SetStatus("Ready to listen", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+            else if (polishedText != null) SetStatus("AI formatted", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+            else SetStatus("Raw mode", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+            if (preferences.ShowComparison)
+                new ComparisonWindow(raw, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, formattingError, preferences.Polish).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

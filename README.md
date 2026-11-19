@@ -17,9 +17,13 @@ Enter the key in settings. Close the settings window, focus a text field, and us
 
 ## Controls and recovery
 
-In settings choose the Windows default microphone or a specific recording device, the standard Whisper model or `whisper-large-v3-turbo`, and optionally disable AI polishing to skip the second request. With polishing disabled, spoken formatting prefixes are not interpreted. Microphone, model and polish preferences take effect on the next dictation; shortcut changes require a restart. The pill displays elapsed processing time after successful insertion; this includes recording finalization, network calls and insertion, not the time spent speaking.
+In settings choose the Windows default microphone or a specific recording device, the standard Whisper model or `whisper-large-v3-turbo`, and optionally disable AI polishing to skip the second request. With polishing disabled, spoken formatting prefixes are not interpreted. Microphone, model, polish and comparison preferences take effect on the next dictation; shortcut changes require a restart. The pill displays elapsed processing time after successful insertion; this includes recording finalization, network calls and insertion, not the time spent speaking.
 
 If formatting fails, the raw transcript is inserted instead and the pill reports a sanitized error category or HTTP status; no provider response body is shown. Review it carefully: speech recognition can be wrong, and spoken mode prefixes are not interpreted. If the target changes or Windows rejects insertion, the result is shown for manual copying. Some text may already have been inserted; check the target before pasting. Recovery text remains in memory only until the window is closed. Copying is explicit and places text on the system clipboard, where other software or clipboard history may access it. A transcription failure has no transcript to recover.
+
+To verify the pipeline, enable **Show transcription and AI comparison after insertion** in settings. After each successful insertion, a window shows the Whisper transcript, the actual formatter output (or a clear disabled/failed state), model names and request times. Identical text does not mean the AI was skipped: the model can choose not to change it. The comparison is opt-in and visible until closed; neither text is saved by Ivy Say. Turn it off for the normal uninterrupted workflow.
+
+The formatter attempts to resolve explicit self-corrections and likely accent-related recognition errors using context. It cannot know the speaker's intent with certainty and can introduce mistakes, especially in names, numbers, technical terms, or short ambiguous phrases. Always review important text before sending.
 
 ## Tests and delivery
 
