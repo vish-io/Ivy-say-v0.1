@@ -17,6 +17,11 @@ jobs:
       - run: dotnet build IvySay/IvySay.csproj -c Release --no-restore
       - run: dotnet test IvySay.Tests/IvySay.Tests.csproj -c Release
       - run: dotnet publish IvySay/IvySay.csproj -c Release -r win-x64 --self-contained true -o publish
+      - name: Verify executable is included
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "publish/IvySay.exe")) { throw "IvySay.exe is missing from the published output" }
+          Get-Item "publish/IvySay.exe" | Format-List Name,Length,FullName
       - uses: actions/upload-artifact@v4
         with:
           name: IvySay-win-x64
