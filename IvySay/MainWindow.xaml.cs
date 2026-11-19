@@ -55,7 +55,7 @@ public partial class MainWindow : Window
                 target = Native.GetForegroundWindow();
                 if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
                 targetControl = Native.FocusedControl(target);
-                recorder = new AudioRecorder();
+                recorder = new AudioRecorder(Preferences.Load().Microphone);
                 recorder.Start();
                 recordingTimer.Start();
                 SetStatus("Listening…", "Press shortcut again to finish");
@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         var current = recorder;
         recorder = null;
         string? recoverableText = null;
+        bool formattingFailed = false;
         try
         {
             var stopwatch = Stopwatch.StartNew();
@@ -90,10 +91,9 @@ public partial class MainWindow : Window
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
                 catch
                 {
-                    SetStatus("Review dictation", "Formatting failed");
-                    new RecoveryWindow(raw, "Formatting failed, so the unformatted transcript was not inserted automatically.").Show();
-                    recoverableText = null;
-                    return;
+                    // Preserve the dictation when formatting is unavailable; it is still subject
+                    // to the same foreground and focus checks as polished text.
+                    formattingFailed = true;
                 }
             }
             // Do not inject while modifiers from the shortcut are still held.
@@ -101,7 +101,8 @@ public partial class MainWindow : Window
             if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
             Native.TypeText(recoverableText, target, targetControl);
             recoverableText = null;
-            SetStatus("Ready to listen", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+            if (formattingFailed) SetStatus("Raw transcript inserted", "Formatting failed · check your text");
+            else SetStatus("Ready to listen", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

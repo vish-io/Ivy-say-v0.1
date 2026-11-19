@@ -14,6 +14,9 @@
       <TextBlock Text="SPEED &amp; FORMATTING" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
       <TextBlock Text="Transcription model" FontWeight="SemiBold" Margin="0,10,0,6"/>
       <ComboBox x:Name="Model" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Whisper large v3 · quality"/><ComboBoxItem Content="Whisper large v3 turbo · faster"/></ComboBox>
+      <TextBlock Text="Microphone" FontWeight="SemiBold" Margin="0,16,0,6"/>
+      <ComboBox x:Name="Microphone" Padding="8" DisplayMemberPath="Label"/>
+      <TextBlock Text="Choose the device you speak into, or use the Windows default." Foreground="#687a70" FontSize="12" TextWrapping="Wrap" Margin="0,7,0,0"/>
       <TextBlock Text="Global shortcut" FontWeight="SemiBold" Margin="0,16,0,6"/>
       <ComboBox x:Name="Shortcut" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox>
       <TextBlock Text="Restart Ivy Say to apply a shortcut change." Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>

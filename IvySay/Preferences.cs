@@ -8,6 +8,7 @@ internal sealed class Preferences
 {
     public string TranscriptionModel { get; set; } = "whisper-large-v3";
     public string Shortcut { get; set; } = "CtrlWinSpace";
+    public string? Microphone { get; set; }
     public bool Polish { get; set; } = true;
     private static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay", "preferences.json");
     public static Preferences Load()

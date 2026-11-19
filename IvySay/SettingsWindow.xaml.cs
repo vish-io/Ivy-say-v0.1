@@ -1,13 +1,32 @@
 using System.Windows;
+using NAudio.Wave;
 
 namespace IvySay;
 public partial class SettingsWindow : Window
 {
+    private sealed record MicrophoneOption(string Label, string? DeviceName);
     public SettingsWindow()
     {
         InitializeComponent(); RefreshStatus();
         var preferences = Preferences.Load();
         Model.SelectedIndex = preferences.TranscriptionModel == "whisper-large-v3-turbo" ? 1 : 0;
+        Microphone.Items.Add(new MicrophoneOption("Windows default", null));
+        for (int i = 0; i < WaveIn.DeviceCount; i++)
+        {
+            string name = WaveIn.GetCapabilities(i).ProductName;
+            Microphone.Items.Add(new MicrophoneOption(name, name));
+        }
+        Microphone.SelectedIndex = 0;
+        if (!string.IsNullOrEmpty(preferences.Microphone))
+        {
+            var selected = Microphone.Items.Cast<MicrophoneOption>().FirstOrDefault(item => item.DeviceName == preferences.Microphone);
+            if (selected == null)
+            {
+                selected = new MicrophoneOption(preferences.Microphone + " (unavailable)", preferences.Microphone);
+                Microphone.Items.Add(selected);
+            }
+            Microphone.SelectedItem = selected;
+        }
         Polish.IsChecked = preferences.Polish;
         Shortcut.SelectedIndex = preferences.Shortcut switch { "CtrlShiftSpace" => 1, "AltShiftSpace" => 2, _ => 0 };
     }
@@ -15,7 +34,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            new Preferences { TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Polish = Polish.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
+            new Preferences { TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
             MessageBox.Show("Preferences saved. Restart Ivy Say to apply shortcut changes.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }

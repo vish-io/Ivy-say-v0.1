@@ -11,9 +11,16 @@ internal sealed class AudioRecorder : IDisposable
     private bool limitReached;
     // Bound memory usage and upload size to two minutes of 16 kHz mono PCM.
     private const int MaxBytes = 16000 * 2 * 120;
-    public AudioRecorder()
+    public AudioRecorder(string? microphone)
     {
-        input = new WaveInEvent { WaveFormat = new WaveFormat(16000, 16, 1), BufferMilliseconds = 50 };
+        int deviceNumber = -1; // WAVE_MAPPER follows the Windows default recording device.
+        if (!string.IsNullOrEmpty(microphone))
+        {
+            deviceNumber = Enumerable.Range(0, WaveIn.DeviceCount)
+                .FirstOrDefault(i => WaveIn.GetCapabilities(i).ProductName == microphone, -1);
+            if (deviceNumber < 0) throw new InvalidOperationException("The selected microphone is unavailable. Choose another in settings.");
+        }
+        input = new WaveInEvent { DeviceNumber = deviceNumber, WaveFormat = new WaveFormat(16000, 16, 1), BufferMilliseconds = 50 };
         input.DataAvailable += (_, e) => { lock (sync) { int remaining = MaxBytes - (int)pcm.Length; if (remaining > 0) pcm.Write(e.Buffer, 0, Math.Min(remaining, e.BytesRecorded)); if (e.BytesRecorded > remaining) limitReached = true; } };
         input.RecordingStopped += (_, e) => stopped.TrySetResult(e.Exception);
     }

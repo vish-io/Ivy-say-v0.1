@@ -17,9 +17,9 @@ Enter the key in settings. Close the settings window, focus a text field, and us
 
 ## Controls and recovery
 
-In settings choose the standard Whisper model or `whisper-large-v3-turbo`, and optionally disable Llama polishing to skip the second request. With polishing disabled, spoken formatting prefixes are not interpreted. Model and polish preferences take effect on the next dictation; shortcut changes require a restart. The pill displays elapsed processing time after successful insertion; this includes recording finalization, network calls and insertion, not the time spent speaking.
+In settings choose the Windows default microphone or a specific recording device, the standard Whisper model or `whisper-large-v3-turbo`, and optionally disable Llama polishing to skip the second request. With polishing disabled, spoken formatting prefixes are not interpreted. Microphone, model and polish preferences take effect on the next dictation; shortcut changes require a restart. The pill displays elapsed processing time after successful insertion; this includes recording finalization, network calls and insertion, not the time spent speaking.
 
-If formatting fails, the unformatted transcript appears in an editable recovery window rather than being silently inserted. If the target changes or Windows rejects insertion, the result is shown for manual copying. Some text may already have been inserted; check the target before pasting. Recovery text remains in memory only until the window is closed. Copying is explicit and places text on the system clipboard, where other software or clipboard history may access it. A transcription failure has no transcript to recover.
+If formatting fails, the raw transcript is inserted instead and the pill reports the failure. Review it carefully: speech recognition can be wrong, and spoken mode prefixes are not interpreted. If the target changes or Windows rejects insertion, the result is shown for manual copying. Some text may already have been inserted; check the target before pasting. Recovery text remains in memory only until the window is closed. Copying is explicit and places text on the system clipboard, where other software or clipboard history may access it. A transcription failure has no transcript to recover.
 
 ## Tests and delivery
 
