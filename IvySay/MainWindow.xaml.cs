@@ -57,9 +57,19 @@ public partial class MainWindow : Window
                 target = Native.GetForegroundWindow();
                 if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
                 targetControl = Native.FocusedControl(target);
-                recorder = new AudioRecorder(Preferences.Load().Microphone);
+                var settingsSnapshot = Preferences.Load();
+                recorder = new AudioRecorder(settingsSnapshot.Microphone);
                 recorder.Start();
                 recordingTimer.Start();
+                if (settingsSnapshot.WarmConnection)
+                {
+                    CancellationToken token = lifetime.Token;
+                    _ = Task.Run(async () =>
+                    {
+                        try { await groq.WarmConnectionAsync(KeyStore.Load(), token); }
+                        catch { /* Warmup is best-effort and must never prevent recording. */ }
+                    });
+                }
                 SetStatus("Listening…", "Press shortcut again to finish");
             }
             catch (Exception ex) { recorder?.Dispose(); recorder = null; ShowError(ex); }

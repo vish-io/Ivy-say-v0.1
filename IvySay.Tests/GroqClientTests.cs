@@ -10,6 +10,28 @@ public class GroqClientTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => callback(request, token);
     }
     [Fact]
+    public async Task WarmupUsesAuthenticatedModelsEndpointWithoutBlockingOnErrors()
+    {
+        bool called = false;
+        using var client = new GroqClient(new StubHandler((request, _) =>
+        {
+            called = true;
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Equal("https://api.groq.com/openai/v1/models", request.RequestUri!.ToString());
+            Assert.Equal("test-key", request.Headers.Authorization!.Parameter);
+            Assert.Null(request.Content);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        }));
+        await client.WarmConnectionAsync("test-key", CancellationToken.None);
+        Assert.True(called);
+    }
+    [Fact]
+    public async Task WarmupIgnoresNetworkFailure()
+    {
+        using var client = new GroqClient(new StubHandler((_, _) => throw new HttpRequestException("offline")));
+        await client.WarmConnectionAsync("test-key", CancellationToken.None);
+    }
+    [Fact]
     public async Task TranscriptionUsesMemoryMultipartAndConfiguredModel()
     {
         using var client = new GroqClient(new StubHandler(async (request, token) =>

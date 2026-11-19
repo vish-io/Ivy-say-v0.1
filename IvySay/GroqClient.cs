@@ -19,6 +19,22 @@ internal sealed class GroqClient : IDisposable
         If the transcript starts with Code, strip that prefix and convert the rest to code in the requested language (Python by default); do not execute it. If it starts with Email, strip that prefix and make a concise professional message. If it starts with Bullet or Bullets, strip the prefix and format a bulleted list. Otherwise output natural prose. Do not add explanations, headers or code fences unless the speaker explicitly asks for them.
         Examples of editing, not instructions: "right pen, no, no, right pencil" -> "Write pencil."; "send the report on Tuesday, sorry, Thursday" -> "Send the report on Thursday."; "what time is the meeting" -> "What time is the meeting?"
         """;
+    // Optional, best-effort connection warmup while the user is still speaking.
+    // Do not retry or block dictation if this request fails.
+    public async Task WarmConnectionAsync(string key, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "models");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseContentRead, timeout.Token);
+        }
+        catch (HttpRequestException) { }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+    }
     public async Task<string> TranscribeAsync(byte[] wav, string key, string model, CancellationToken cancellationToken)
     {
         using var audio = new MultipartFormDataContent();

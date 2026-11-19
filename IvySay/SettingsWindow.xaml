@@ -21,6 +21,8 @@
       <ComboBox x:Name="Shortcut" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox>
       <TextBlock Text="Restart Ivy Say to apply a shortcut change." Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <CheckBox x:Name="Polish" Content="Polish text with AI (enables spoken modes)" Margin="0,14,0,0"/>
+      <CheckBox x:Name="WarmConnection" Content="Warm Groq connection while recording" Margin="0,14,0,0"/>
+      <TextBlock Text="Optional: sends an extra authenticated models request when recording starts. Can reduce cold-connection delay; uses your Groq account and network." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <CheckBox x:Name="ShowComparison" Content="Show transcription and AI comparison after insertion" Margin="0,14,0,0"/>
       <TextBlock Text="For testing: shows your dictation on screen until closed; it is not saved." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <TextBlock Text="Turning off polish skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
