@@ -32,7 +32,7 @@ internal sealed class GroqClient : IDisposable
     }
     public async Task<string> PolishAsync(string raw, string key, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions") { Content = JsonContent.Create(new { model = "llama-3.1-8b-instant", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = raw } }, temperature = 0.1, max_tokens = 1024 }) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions") { Content = JsonContent.Create(new { model = "openai/gpt-oss-20b", reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = raw } }, temperature = 0.1, max_completion_tokens = 2048 }) };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         using var response = await http.SendAsync(request, cancellationToken);
         await EnsureSuccess(response);
@@ -44,7 +44,7 @@ internal sealed class GroqClient : IDisposable
     private static Task EnsureSuccess(HttpResponseMessage response)
     {
         // Never surface provider bodies: they can contain user data or secrets.
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Groq request failed (HTTP {(int)response.StatusCode}). Check your key, network, and Groq account limits.");
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException("Groq request failed. Check your key, network, and Groq account limits.", null, response.StatusCode);
         return Task.CompletedTask;
     }
     public void Dispose() => http.Dispose();

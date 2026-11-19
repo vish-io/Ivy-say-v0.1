@@ -1,10 +1,10 @@
 # Ivy Say
 
-A Windows-native, bring-your-own-key dictation MVP. Press **Ctrl + Win + Space** to start recording and again to stop (or choose another shortcut in settings). Ivy Say transcribes with Groq Whisper, formats with Llama 3.1 8B Instant, and inserts Unicode text into the original foreground window. Start with **Code**, **Email**, or **Bullet** to change formatting. Drag the floating pill to reposition it; its gear opens settings.
+A Windows-native, bring-your-own-key dictation MVP. Press **Ctrl + Win + Space** to start recording and again to stop (or choose another shortcut in settings). Ivy Say transcribes with Groq Whisper, formats with GPT-OSS 20B, and inserts Unicode text into the original foreground window. Start with **Code**, **Email**, or **Bullet** to change formatting. Drag the floating pill to reposition it; its gear opens settings.
 
 ## Build and run
 
-Requires Windows 10/11, the .NET 8 SDK, a working microphone, and a Groq API key with access to `whisper-large-v3` and `llama-3.1-8b-instant`.
+Requires Windows 10/11, the .NET 8 SDK, a working microphone, and a Groq API key with access to `whisper-large-v3` and `openai/gpt-oss-20b`.
 
 ```powershell
 dotnet restore IvySay/IvySay.csproj
@@ -17,9 +17,9 @@ Enter the key in settings. Close the settings window, focus a text field, and us
 
 ## Controls and recovery
 
-In settings choose the Windows default microphone or a specific recording device, the standard Whisper model or `whisper-large-v3-turbo`, and optionally disable Llama polishing to skip the second request. With polishing disabled, spoken formatting prefixes are not interpreted. Microphone, model and polish preferences take effect on the next dictation; shortcut changes require a restart. The pill displays elapsed processing time after successful insertion; this includes recording finalization, network calls and insertion, not the time spent speaking.
+In settings choose the Windows default microphone or a specific recording device, the standard Whisper model or `whisper-large-v3-turbo`, and optionally disable AI polishing to skip the second request. With polishing disabled, spoken formatting prefixes are not interpreted. Microphone, model and polish preferences take effect on the next dictation; shortcut changes require a restart. The pill displays elapsed processing time after successful insertion; this includes recording finalization, network calls and insertion, not the time spent speaking.
 
-If formatting fails, the raw transcript is inserted instead and the pill reports the failure. Review it carefully: speech recognition can be wrong, and spoken mode prefixes are not interpreted. If the target changes or Windows rejects insertion, the result is shown for manual copying. Some text may already have been inserted; check the target before pasting. Recovery text remains in memory only until the window is closed. Copying is explicit and places text on the system clipboard, where other software or clipboard history may access it. A transcription failure has no transcript to recover.
+If formatting fails, the raw transcript is inserted instead and the pill reports a sanitized error category or HTTP status; no provider response body is shown. Review it carefully: speech recognition can be wrong, and spoken mode prefixes are not interpreted. If the target changes or Windows rejects insertion, the result is shown for manual copying. Some text may already have been inserted; check the target before pasting. Recovery text remains in memory only until the window is closed. Copying is explicit and places text on the system clipboard, where other software or clipboard history may access it. A transcription failure has no transcript to recover.
 
 ## Tests and delivery
 
@@ -31,7 +31,7 @@ The key is encrypted with Windows DPAPI for the current user and stored in `%LOC
 
 ## Latency and design
 
-WPF/.NET keeps the native Windows shell small and uses an OS-wide registered shortcut. One long-lived HttpClient pools HTTPS connections; audio is recorded directly to memory, without audio disk I/O, at 16 kHz mono. WAV avoids encoding overhead but is larger than Opus; benchmark in-memory Opus on real networks before adding encoder complexity. Groq requests run sequentially (transcription then formatting), and service/network latency varies: sub-450 ms cannot be guaranteed. Groq's file transcription endpoint is not treated as a streaming API; sending speculative chunks while speaking requires careful overlap, ordering, and correction handling and is not implemented. Hardcoding Groq IPs is intentionally avoided: IPs can change, and bypassing DNS may break routing, failover, or TLS; connection pooling already avoids repeated lookups on reused connections. The turbo model and skipping polishing are optional speed/quality trade-offs. HTTP redirects are disabled so audio and credentials are not forwarded to a redirected endpoint. No background prewarming is performed, avoiding surprise traffic and costs.
+WPF/.NET keeps the native Windows shell small and uses an OS-wide registered shortcut. One long-lived HttpClient pools HTTPS connections; audio is recorded directly to memory, without audio disk I/O, at 16 kHz mono. WAV avoids encoding overhead but is larger than Opus; benchmark in-memory Opus on real networks before adding encoder complexity. Groq requests run sequentially (transcription then formatting), using low reasoning effort and hidden reasoning for GPT-OSS 20B, and service/network latency varies: sub-450 ms cannot be guaranteed. Groq's file transcription endpoint is not treated as a streaming API; sending speculative chunks while speaking requires careful overlap, ordering, and correction handling and is not implemented. Hardcoding Groq IPs is intentionally avoided: IPs can change, and bypassing DNS may break routing, failover, or TLS; connection pooling already avoids repeated lookups on reused connections. The turbo model and skipping polishing are optional speed/quality trade-offs. HTTP redirects are disabled so audio and credentials are not forwarded to a redirected endpoint. No background prewarming is performed, avoiding surprise traffic and costs.
 
 ## MVP limitations
 

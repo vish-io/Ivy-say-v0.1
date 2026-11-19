@@ -20,7 +20,7 @@
       <TextBlock Text="Global shortcut" FontWeight="SemiBold" Margin="0,16,0,6"/>
       <ComboBox x:Name="Shortcut" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox>
       <TextBlock Text="Restart Ivy Say to apply a shortcut change." Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <CheckBox x:Name="Polish" Content="Polish text with Llama (enables spoken modes)" Margin="0,14,0,0"/>
+      <CheckBox x:Name="Polish" Content="Polish text with AI (enables spoken modes)" Margin="0,14,0,0"/>
       <TextBlock Text="Turning off polish skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <Button Content="Save preferences" Click="SavePreferences" HorizontalAlignment="Left" Margin="0,14,0,0"/>
     </StackPanel></Border>

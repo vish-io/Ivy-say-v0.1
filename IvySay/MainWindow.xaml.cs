@@ -3,6 +3,8 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Diagnostics;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace IvySay;
 public partial class MainWindow : Window
@@ -68,7 +70,7 @@ public partial class MainWindow : Window
         var current = recorder;
         recorder = null;
         string? recoverableText = null;
-        bool formattingFailed = false;
+        string? formattingError = null;
         try
         {
             var stopwatch = Stopwatch.StartNew();
@@ -89,19 +91,28 @@ public partial class MainWindow : Window
                     recoverableText = polished;
                 }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
-                catch
+                catch (Exception ex)
                 {
-                    // Preserve the dictation when formatting is unavailable; it is still subject
-                    // to the same foreground and focus checks as polished text.
-                    formattingFailed = true;
+                    // Never display or log the provider response, transcript, or API key.
+                    formattingError = ex switch
+                    {
+                        HttpRequestException { StatusCode: not null } httpError => $"Groq HTTP {(int)httpError.StatusCode.Value}",
+                        HttpRequestException => "Network error",
+                        OperationCanceledException => "Request timed out",
+                        JsonException or KeyNotFoundException => "Invalid Groq response",
+                        InvalidOperationException => "Empty or incomplete result",
+                        _ => "Formatting error"
+                    };
                 }
             }
             // Do not inject while modifiers from the shortcut are still held.
             for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
-            Native.TypeText(recoverableText, target, targetControl);
+            // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
+            bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl);
             recoverableText = null;
-            if (formattingFailed) SetStatus("Raw transcript inserted", "Formatting failed · check your text");
+            if (formattingError != null) SetStatus("Raw transcript inserted", $"{formattingError} · formatting failed");
             else SetStatus("Ready to listen", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }

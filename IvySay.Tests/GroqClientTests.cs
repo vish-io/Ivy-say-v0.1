@@ -32,7 +32,10 @@ public class GroqClientTests
         {
             Assert.EndsWith("/chat/completions", request.RequestUri!.AbsolutePath);
             string body = await request.Content!.ReadAsStringAsync(token);
-            Assert.Contains("llama-3.1-8b-instant", body);
+            Assert.Contains("openai/gpt-oss-20b", body);
+            Assert.Contains("\"reasoning_effort\":\"low\"", body);
+            Assert.Contains("\"reasoning_format\":\"hidden\"", body);
+            Assert.Contains("\"max_completion_tokens\":2048", body);
             Assert.Contains("Bullet buy milk", body);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"- Buy milk\"}}]}", Encoding.UTF8, "application/json") };
         }));
@@ -42,8 +45,8 @@ public class GroqClientTests
     public async Task ErrorMessageDoesNotExposeProviderBody()
     {
         using var client = new GroqClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("secret provider body") })));
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3", CancellationToken.None));
-        Assert.Contains("401", error.Message);
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3", CancellationToken.None));
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
         Assert.DoesNotContain("secret provider body", error.Message);
         Assert.DoesNotContain("test-key", error.Message);
     }
