@@ -27,6 +27,14 @@ For a faster transcription path while keeping AI formatting, select **Whisper la
 
 The formatter attempts to resolve explicit self-corrections and likely accent-related recognition errors using context. It cannot know the speaker's intent with certainty and can introduce mistakes, especially in names, numbers, technical terms, or short ambiguous phrases. Always review important text before sending.
 
+## Personal vocabulary and optional personalization
+
+In settings under **Personalization**, add vocabulary terms (one per line) and/or corrections (`heard phrase => intended phrase`, one per line). Check **Use my vocabulary and corrections** and click **Save personalization**. This is opt-in and is separate from the general Save preferences button. Turn it off and save to stop using it, or use **Delete data** to remove the stored profile. There is no automatic learning, audio collection for training, or model fine-tuning.
+
+When enabled, whole vocabulary terms are prioritized into the existing Whisper prompt, up to 160 characters total including any regular spelling hints. Terms that do not fit are skipped; put important terms first. These terms are sent to Groq with each recording. Explicit corrections match whole phrases, case-insensitively, and are applied once locally after transcription and before AI formatting; they can still replace a word in the wrong context, so review results. The corrected transcript is sent to Groq for polishing when enabled. The comparison window shows Whisper's result, the locally corrected text, and the AI output separately. Personalization cannot guarantee accent recognition and does not adapt to every new error.
+
+Vocabulary and corrections are encrypted at rest using Windows DPAPI for the current account in `%LOCALAPPDATA%\IvySay\personalization.dat`; disabling the feature does not delete them. They are held in memory while used. Windows account malware can access them, and vocabulary and corrected text are sent to Groq as described above; avoid secrets. The older ordinary spelling hints remain separately stored unencrypted in `preferences.json`.
+
 ## Tests and delivery
 
 Run `dotnet test IvySay.Tests/IvySay.Tests.csproj` to test the WAV encoder and Groq request handling with a fake HTTP handler. The Windows GitHub Actions workflow builds, tests, and publishes a self-contained x64 artifact. The artifact is not signed and is not a production release. Follow [the manual test checklist](docs/TESTING.md) on a Windows machine before distributing it.

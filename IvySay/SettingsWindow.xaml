@@ -34,6 +34,18 @@
       <TextBlock Text="Turning off polish skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <Button Content="Save preferences" Click="SavePreferences" HorizontalAlignment="Left" Margin="0,14,0,0"/>
     </StackPanel></Border>
+    <Border Background="White" BorderBrush="#e2eae2" BorderThickness="1" CornerRadius="14" Margin="0,18,0,0" Padding="22"><StackPanel>
+      <TextBlock Text="PERSONALIZATION · OPTIONAL" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
+      <CheckBox x:Name="UsePersonalization" Content="Use my vocabulary and corrections" Margin="0,12,0,0"/>
+      <TextBlock Text="Use Save personalization below to apply this section; the Save preferences button above does not save it." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
+      <TextBlock Text="Vocabulary: names and terms, one per line" FontWeight="SemiBold" Margin="0,16,0,6"/>
+      <TextBox x:Name="Vocabulary" AcceptsReturn="True" MaxLength="1000" Height="78" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8"/>
+      <TextBlock Text="Corrections: one per line, heard phrase =&gt; intended phrase" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,16,0,6"/>
+      <TextBox x:Name="Corrections" AcceptsReturn="True" MaxLength="4500" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" ToolTip="Example: grindel wald =&gt; Grindelwald"/>
+      <TextBlock Text="Example: grindel wald =&gt; Grindelwald. Corrections apply only to exact phrases, not new accents automatically. Check output carefully." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
+      <TextBlock Text="Encrypted for your Windows account. When enabled, up to 160 characters of whole vocabulary and spelling-hint terms are sent to Groq as a transcription hint; corrections are applied locally before the corrected transcript is sent for AI polishing. No automatic learning. Do not add secrets." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,10,0,0"/>
+      <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="Save personalization" Click="SavePersonalization"/><Button Content="Delete data" Click="DeletePersonalization" Background="#e8efe9" Foreground="#355246" Margin="10,0,0,0"/></StackPanel>
+    </StackPanel></Border>
     <Border Background="#e7f1e6" CornerRadius="12" Padding="18" Margin="0,18,0,0"><StackPanel><TextBlock Text="HOW TO DICTATE" FontWeight="Bold" FontSize="10" Foreground="#5a7b67"/><TextBlock Text="Focus any text field. Press your shortcut to start, then press it again to finish." TextWrapping="Wrap" Margin="0,8,0,0" FontSize="13"/><TextBlock Text="Try starting with Code, Email, or Bullet to switch formats." TextWrapping="Wrap" Margin="0,7,0,0" Foreground="#63796b" FontSize="12"/></StackPanel></Border>
     <TextBlock Text="Your key is encrypted for this Windows account. Audio and text are sent to Groq for processing." TextWrapping="Wrap" Foreground="#7a8c80" FontSize="11" Margin="0,18,0,0"/>
     <Button Content="Quit Ivy Say" Click="Quit" Background="Transparent" Foreground="#677b6e" HorizontalAlignment="Left" Padding="0,14"/>

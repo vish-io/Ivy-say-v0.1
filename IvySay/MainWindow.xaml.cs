@@ -88,20 +88,30 @@ public partial class MainWindow : Window
             byte[] wav = await current.StopAsync();
             var preferences = Preferences.Load();
             string key = KeyStore.Load();
+            PersonalizationData personal = new();
+            if (preferences.UsePersonalization)
+            {
+                try { personal = PersonalizationStore.Load(); }
+                catch { throw new InvalidOperationException("Could not load your encrypted personalization data. Open settings to review or delete it."); }
+            }
+            string hints = preferences.UsePersonalization
+                ? PersonalizationRules.BuildPrompt(personal.Vocabulary, preferences.SpellingHints)
+                : preferences.SpellingHints;
             var transcriptionTimer = Stopwatch.StartNew();
-            string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, preferences.Language, preferences.SpellingHints, lifetime.Token);
+            string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, preferences.Language, hints, lifetime.Token);
             transcriptionTimer.Stop();
             TimeSpan? formattingTime = null;
             string? polishedText = null;
             if (raw.Length == 0) { SetStatus("Nothing heard", "Try speaking a little louder"); return; }
-            recoverableText = raw;
+            string corrected = preferences.UsePersonalization ? PersonalizationRules.Parse(personal.Corrections).Apply(raw) : raw;
+            recoverableText = corrected;
             if (preferences.Polish)
             {
                 SetStatus("Thinking…", "Polishing your words");
                 try
                 {
                     var formattingTimer = Stopwatch.StartNew();
-                    string polished = await groq.PolishAsync(raw, key, lifetime.Token);
+                    string polished = await groq.PolishAsync(corrected, key, lifetime.Token);
                     formattingTimer.Stop();
                     formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
@@ -130,11 +140,11 @@ public partial class MainWindow : Window
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl);
             recoverableText = null;
-            if (formattingError != null) SetStatus("Raw transcript inserted", $"{formattingError} · formatting failed");
+            if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", $"{formattingError} · formatting failed");
             else if (polishedText != null) SetStatus("AI formatted", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
-            else SetStatus("Raw mode", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+            else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, formattingError, preferences.Polish).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

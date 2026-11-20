@@ -11,6 +11,7 @@ internal sealed class Preferences
     public string SpellingHints { get; set; } = "";
     public string Shortcut { get; set; } = "CtrlWinSpace";
     public string? Microphone { get; set; }
+    public bool UsePersonalization { get; set; }
     public bool WarmConnection { get; set; }
     public bool ShowComparison { get; set; }
     public bool Polish { get; set; } = true;

@@ -4,6 +4,7 @@ using NAudio.Wave;
 namespace IvySay;
 public partial class SettingsWindow : Window
 {
+    private bool personalizationReadable = true;
     private sealed record MicrophoneOption(string Label, string? DeviceName);
     public SettingsWindow()
     {
@@ -32,16 +33,44 @@ public partial class SettingsWindow : Window
         Polish.IsChecked = preferences.Polish;
         ShowComparison.IsChecked = preferences.ShowComparison;
         WarmConnection.IsChecked = preferences.WarmConnection;
+        UsePersonalization.IsChecked = preferences.UsePersonalization;
+        try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; Corrections.Text = data.Corrections; }
+        catch { personalizationReadable = false; MessageBox.Show("Could not decrypt personalization data for this Windows account. Existing data was not changed. Delete it explicitly before creating a new profile.", "Ivy Say"); }
         Shortcut.SelectedIndex = preferences.Shortcut switch { "CtrlShiftSpace" => 1, "AltShiftSpace" => 2, _ => 0 };
     }
     private void SavePreferences(object sender, RoutedEventArgs e)
     {
         try
         {
-            new Preferences { Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
+            new Preferences { UsePersonalization = Preferences.Load().UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
             MessageBox.Show("Preferences saved. Restart Ivy Say to apply shortcut changes.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }
+    }
+    private void SavePersonalization(object sender, RoutedEventArgs e)
+    {
+        if (!personalizationReadable) { MessageBox.Show("Existing personalization could not be read. Delete it explicitly before saving a new profile.", "Ivy Say"); return; }
+        try
+        {
+            PersonalizationStore.Save(new PersonalizationData { Vocabulary = Vocabulary.Text.Trim(), Corrections = Corrections.Text.Trim() });
+            var preferences = Preferences.Load();
+            preferences.UsePersonalization = UsePersonalization.IsChecked == true;
+            preferences.Save();
+            MessageBox.Show("Personalization saved. It applies to the next dictation when enabled.", "Ivy Say");
+        }
+        catch (ArgumentException ex) { MessageBox.Show(ex.Message, "Ivy Say"); }
+        catch { MessageBox.Show("Could not securely save personalization.", "Ivy Say"); }
+    }
+    private void DeletePersonalization(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Delete your saved vocabulary and corrections from this device?", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        try
+        {
+            PersonalizationStore.Delete();
+            var preferences = Preferences.Load(); preferences.UsePersonalization = false; preferences.Save();
+            Vocabulary.Clear(); Corrections.Clear(); UsePersonalization.IsChecked = false; personalizationReadable = true;
+        }
+        catch { MessageBox.Show("Could not remove personalization data or update settings.", "Ivy Say"); }
     }
     private void RefreshStatus() => KeyStatus.Text = KeyStore.Exists ? "A key is saved securely. Enter a new key to replace it." : "Enter your Groq API key to get started. It stays encrypted on this device.";
     private void SaveKey(object sender, RoutedEventArgs e)
