@@ -44,7 +44,7 @@ internal static class Native
     [StructLayout(LayoutKind.Explicit)] private struct InputUnion { [FieldOffset(0)] public KEYBDINPUT keyboard; [FieldOffset(0)] public MOUSEINPUT mouse; }
     [StructLayout(LayoutKind.Sequential)] private struct KEYBDINPUT { public ushort vk, scan; public uint flags, time; public UIntPtr extra; }
     [StructLayout(LayoutKind.Sequential)] private struct MOUSEINPUT { public int dx, dy; public uint mouseData, flags, time; public UIntPtr extra; }
-    public static void TypeText(string text, IntPtr target, IntPtr focus)
+    public static void TypeText(string text, IntPtr target, IntPtr focus, Action<char>? onAccepted = null)
     {
         if (target == IntPtr.Zero || GetForegroundWindow() != target) throw new InvalidOperationException("The target window changed. Text was not inserted; try again in the intended app.");
         if (focus != IntPtr.Zero && FocusedControl(target) != focus) throw new InvalidOperationException("The focused control changed.");
@@ -57,6 +57,7 @@ internal static class Native
             inputs[0].data.keyboard = new KEYBDINPUT { scan = c, flags = 4 };
             inputs[1].data.keyboard = new KEYBDINPUT { scan = c, flags = 4 | 2 };
             if (SendInput(2, inputs, Marshal.SizeOf<INPUT>()) != 2) throw new InvalidOperationException("Windows blocked text insertion. Try an app running at the same privilege level.");
+            onAccepted?.Invoke(c);
         }
     }
 }

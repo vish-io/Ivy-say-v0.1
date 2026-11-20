@@ -22,7 +22,7 @@ In the default streaming-preview mode, fragments are shown in the pill but are n
 
 API requests use HTTPS with standard certificate validation, no automatic redirects, a shared connection pool, bounded recording size, response-size limits (256 KiB), and bounded request times including reading the body. Error bodies are not displayed. Prompt injection is not prevented by these network bounds. Groq receives recorded audio and transcripts; review its terms and retention policies.
 
-The Groq key and optional personal vocabulary/corrections are protected with DPAPI bound to the Windows user account. It is not a defense against malware already running as that user. General spelling hints are unencrypted in `preferences.json` and sent to Groq. No transcript history or recordings are intentionally written to disk. Windows clipboard history, paging, crash dumps, target apps and external software can retain sensitive data. Avoid dictating secrets into untrusted apps.
+The Groq key and optional personal vocabulary/corrections are protected with DPAPI bound to the Windows user account. It is not a defense against malware already running as that user. General spelling hints are unencrypted in `preferences.json` and sent to Groq. No transcript history or recordings are intentionally written to disk. Daily word counts and recording durations are stored unencrypted as local aggregate statistics and can be cleared in settings. Windows clipboard history, paging, crash dumps, target apps and external software can retain sensitive data. Avoid dictating secrets into untrusted apps.
 
 ## Remaining release work
 

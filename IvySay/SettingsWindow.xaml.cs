@@ -9,7 +9,7 @@ public partial class SettingsWindow : Window
     private sealed record MicrophoneOption(string Label, string? DeviceName);
     public SettingsWindow()
     {
-        InitializeComponent(); RefreshStatus();
+        InitializeComponent(); RefreshStatus(); RefreshStats();
         var preferences = Preferences.Load();
         SpokenLanguage.SelectedIndex = preferences.Language switch { "en" => 1, "hi" => 2, "pa" => 3, _ => 0 };
         SpellingHints.Text = preferences.SpellingHints;
@@ -69,6 +69,22 @@ public partial class SettingsWindow : Window
         SecurityDescription.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(SecurityLevel.SelectedIndex == 0 ? "#a04b35" : "#687a70"));
     }
     private void CloseSettings(object sender, RoutedEventArgs e) => Close();
+    private void RefreshStats()
+    {
+        try
+        {
+            double? average = UsageStatistics.Default.SevenDayAverage(DateTime.Now);
+            StatsValue.Text = average.HasValue ? $"{average.Value:F0} WPM" : "— WPM";
+            StatsDetail.Text = average.HasValue ? "Output words ÷ recording time · successful insertions" : "No successful dictations recorded in the last 7 days.";
+        }
+        catch { StatsValue.Text = "— WPM"; StatsDetail.Text = "Statistics unavailable on this device."; }
+    }
+    private void ClearStats(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show("Clear your local dictation statistics?", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        try { UsageStatistics.Default.Clear(); RefreshStats(); }
+        catch { MessageBox.Show("Could not clear local statistics.", "Ivy Say"); }
+    }
     private void SavePersonalization(object sender, RoutedEventArgs e)
     {
         if (!personalizationReadable) { MessageBox.Show("Existing personalization could not be read. Delete it explicitly before saving a new profile.", "Ivy Say"); return; }

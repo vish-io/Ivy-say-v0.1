@@ -85,9 +85,10 @@ public partial class MainWindow : Window
         bool allowUnsafeCopy = false;
         try
         {
-            var stopwatch = Stopwatch.StartNew();
             SetStatus("Thinking…", "Transcribing your voice");
             byte[] wav = await current.StopAsync();
+            // Audio is 16 kHz, mono, 16-bit PCM with a 44-byte WAV header.
+            TimeSpan recordingDuration = TimeSpan.FromSeconds((wav.Length - 44) / 32000d);
             var preferences = Preferences.Load();
             allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
             string key = KeyStore.Load();
@@ -111,6 +112,7 @@ public partial class MainWindow : Window
             recoverableText = corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             bool directComplete = false;
+            FirstWordTimer? firstWordTimer = null;
             if (preferences.Polish)
             {
                 SetStatus("Thinking…", "Polishing your words");
@@ -125,6 +127,8 @@ public partial class MainWindow : Window
                         if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
                     }
                     var formattingTimer = Stopwatch.StartNew();
+                    var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
+                    firstWordTimer = currentWordTimer;
                     string polished = await groq.PolishStreamingAsync(corrected, key, fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -136,18 +140,18 @@ public partial class MainWindow : Window
                         {
                             if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
                             directAttempted = true; // Even a failed call can insert part of a fragment.
-                            Native.TypeText(fragment, target, targetControl);
+                            Native.TypeText(fragment, target, targetControl, currentWordTimer.Observe);
                         }
                         return Task.CompletedTask;
                     }, lifetime.Token);
-                    formattingTimer.Stop();
                     formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
                     {
                         if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
-                        Native.TypeText(" ", target, targetControl);
+                        Native.TypeText(" ", target, targetControl, currentWordTimer.Observe);
                     }
+                    if (direct) currentWordTimer.Complete();
                     directComplete = direct;
                     polishedText = direct ? polished : polished.Trim();
                     recoverableText = polishedText;
@@ -176,8 +180,9 @@ public partial class MainWindow : Window
             }
             if (directComplete)
             {
+                _ = UsageStatistics.Default.RecordAsync(polishedText!, recordingDuration, DateTime.Now);
                 recoverableText = null;
-                SetStatus("AI formatted", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+                SetCompletionStatus(firstWordTimer);
                 if (preferences.ShowComparison)
                     new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
                 return;
@@ -196,11 +201,13 @@ public partial class MainWindow : Window
             for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
-            Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl);
+            Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null);
+            if (polishedText != null) firstWordTimer?.Complete();
+            _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
             if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", $"{formattingError} · formatting failed");
-            else if (polishedText != null) SetStatus("AI formatted", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
-            else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+            else if (polishedText != null) SetCompletionStatus(firstWordTimer);
+            else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
                 new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
         }
@@ -217,6 +224,11 @@ public partial class MainWindow : Window
         finally { current.Dispose(); busy = false; }
     }
 
+    private void SetCompletionStatus(FirstWordTimer? timer)
+    {
+        if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", "AI start → first word");
+        else SetStatus("AI formatted", "No measurable first word");
+    }
     private void SetStatus(string title, string detail) { StatusTitle.Text = title; StatusDetail.Text = detail; }
     private void ShowError(Exception ex)
     {

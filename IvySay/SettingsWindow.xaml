@@ -43,6 +43,7 @@
         <TextBlock Text="For testing: shows the dictation on screen until closed; Ivy Say does not save it." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="  Personalization  "><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="22,18,22,22">
+        <Border Background="#e8f4e6" CornerRadius="12" Padding="18" Margin="0,0,0,22"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="YOUR LAST 7 DAYS" Foreground="#638171" FontSize="10" FontWeight="Bold"/><TextBlock x:Name="StatsValue" Text="— WPM" FontWeight="Bold" FontSize="28" Foreground="#1f3932" Margin="0,6,0,2"/><TextBlock x:Name="StatsDetail" Text="Output words ÷ recording time · successful insertions" TextWrapping="Wrap" Foreground="#61796a" FontSize="12"/></StackPanel><Button Grid.Column="1" Content="Clear stats" Click="ClearStats" Background="#d5e8d4" Foreground="#355246" VerticalAlignment="Center" Margin="12,0,0,0"/></Grid></Border>
         <TextBlock Text="PERSONAL VOCABULARY" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
         <TextBlock Text="Help Ivy Say recognize the names and phrases you use most." FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"/>
         <CheckBox x:Name="UsePersonalization" Content="Use my vocabulary and corrections" Margin="0,16,0,0"/>
