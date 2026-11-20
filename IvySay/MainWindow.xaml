@@ -4,8 +4,8 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
             <Border Background="#b8efb1" CornerRadius="23" Width="40" Height="40"><TextBlock Text="✦" Foreground="#18382d" FontSize="21" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border>
             <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusTitle" Text="Ready to listen" Foreground="White" FontSize="13" FontWeight="SemiBold"/>
-                <TextBlock x:Name="StatusDetail" Text="Ctrl + Win + Space" Foreground="#a9c1b4" FontSize="10" Margin="0,3,0,0"/>
+                <TextBlock x:Name="StatusTitle" Text="Ready to listen" Foreground="White" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                <TextBlock x:Name="StatusDetail" Text="Ctrl + Win + Space" Foreground="#a9c1b4" FontSize="10" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             </StackPanel>
             <Button Grid.Column="2" Content="⚙" ToolTip="Settings" Click="OpenSettings" Background="#2d4940" FontSize="17" Padding="0" Width="38" Height="38"/>
         </Grid>

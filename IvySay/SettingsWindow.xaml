@@ -1,55 +1,63 @@
-<Window x:Class="IvySay.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ivy Say · Settings" Width="560" Height="620" MinWidth="500" MinHeight="580" WindowStartupLocation="CenterScreen" Background="#f5f7f2" Foreground="#202a28" FontFamily="Segoe UI">
-  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="42,36">
-    <StackPanel Orientation="Horizontal"><Border Background="#c6f2bc" CornerRadius="10" Width="38" Height="38"><TextBlock Text="✦" Foreground="#1b4635" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><TextBlock Text="ivy say" FontSize="20" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0"/></StackPanel>
-    <TextBlock Text="Your voice, in flow." FontSize="30" FontWeight="SemiBold" Margin="0,30,0,7"/>
-    <TextBlock Text="A little setup, then let your words do the work." Foreground="#65746c" FontSize="14" TextWrapping="Wrap"/>
-    <Border Background="White" BorderBrush="#e2eae2" BorderThickness="1" CornerRadius="14" Margin="0,28,0,0" Padding="22"><StackPanel>
-      <TextBlock Text="YOUR GROQ API KEY" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
-      <TextBlock Text="Bring your own key" FontSize="18" FontWeight="SemiBold" Margin="0,7,0,4"/>
-      <TextBlock x:Name="KeyStatus" TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,0,0,14"/>
-      <PasswordBox x:Name="ApiKey" Padding="11" BorderBrush="#d6e2d7" FontSize="14" ToolTip="Groq API key"/>
-      <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="Save key" Click="SaveKey"/><Button Content="Remove key" Click="RemoveKey" Background="#e8efe9" Foreground="#355246" Margin="10,0,0,0"/></StackPanel>
-    </StackPanel></Border>
-    <Border Background="White" BorderBrush="#e2eae2" BorderThickness="1" CornerRadius="14" Margin="0,18,0,0" Padding="22"><StackPanel>
-      <TextBlock Text="SPEED &amp; FORMATTING" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
-      <TextBlock Text="Transcription model" FontWeight="SemiBold" Margin="0,10,0,6"/>
-      <ComboBox x:Name="Model" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Whisper large v3 · quality"/><ComboBoxItem Content="Whisper large v3 turbo · faster"/></ComboBox>
-      <TextBlock Text="Spoken language" FontWeight="SemiBold" Margin="0,16,0,6"/>
-      <ComboBox x:Name="SpokenLanguage" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Auto-detect"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox>
-      <TextBlock Text="Choose the language you speak most. For mixed languages, try auto-detect; recognition is not guaranteed." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <TextBlock Text="Spelling hints (optional)" FontWeight="SemiBold" Margin="0,16,0,6"/>
-      <TextBox x:Name="SpellingHints" MaxLength="160" Padding="8" ToolTip="Names and words to help Whisper recognize them"/>
-      <TextBlock Text="Comma-separated names or terms. Saved unencrypted in local preferences and sent to Groq with every recording. Do not enter secrets." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <TextBlock Text="Microphone" FontWeight="SemiBold" Margin="0,16,0,6"/>
-      <ComboBox x:Name="Microphone" Padding="8" DisplayMemberPath="Label"/>
-      <TextBlock Text="Choose the device you speak into, or use the Windows default." Foreground="#687a70" FontSize="12" TextWrapping="Wrap" Margin="0,7,0,0"/>
-      <TextBlock Text="Global shortcut" FontWeight="SemiBold" Margin="0,16,0,6"/>
-      <ComboBox x:Name="Shortcut" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox>
-      <TextBlock Text="Restart Ivy Say to apply a shortcut change." Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <CheckBox x:Name="AlwaysReview" Content="Review every dictation before inserting" Margin="0,14,0,0"/>
-      <TextBlock Text="Known terminals, unverified targets, and multiline output always require review. Detection cannot identify every sensitive target." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <CheckBox x:Name="Polish" Content="Polish text with AI (enables spoken modes)" Margin="0,14,0,0"/>
-      <CheckBox x:Name="WarmConnection" Content="Warm Groq connection while recording" Margin="0,14,0,0"/>
-      <TextBlock Text="Optional: sends an extra authenticated models request when recording starts. Can reduce cold-connection delay; uses your Groq account and network." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <CheckBox x:Name="ShowComparison" Content="Show transcription and AI comparison after insertion" Margin="0,14,0,0"/>
-      <TextBlock Text="For testing: shows your dictation on screen until closed; it is not saved." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <TextBlock Text="Turning off polish skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <Button Content="Save preferences" Click="SavePreferences" HorizontalAlignment="Left" Margin="0,14,0,0"/>
-    </StackPanel></Border>
-    <Border Background="White" BorderBrush="#e2eae2" BorderThickness="1" CornerRadius="14" Margin="0,18,0,0" Padding="22"><StackPanel>
-      <TextBlock Text="PERSONALIZATION · OPTIONAL" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
-      <CheckBox x:Name="UsePersonalization" Content="Use my vocabulary and corrections" Margin="0,12,0,0"/>
-      <TextBlock Text="Use Save personalization below to apply this section; the Save preferences button above does not save it." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <TextBlock Text="Vocabulary: names and terms, one per line" FontWeight="SemiBold" Margin="0,16,0,6"/>
-      <TextBox x:Name="Vocabulary" AcceptsReturn="True" MaxLength="1000" Height="78" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8"/>
-      <TextBlock Text="Corrections: one per line, heard phrase =&gt; intended phrase" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,16,0,6"/>
-      <TextBox x:Name="Corrections" AcceptsReturn="True" MaxLength="4500" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" ToolTip="Example: grindel wald =&gt; Grindelwald"/>
-      <TextBlock Text="Example: grindel wald =&gt; Grindelwald. Corrections apply only to exact phrases, not new accents automatically. Check output carefully." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
-      <TextBlock Text="Encrypted for your Windows account. When enabled, up to 160 characters of whole vocabulary and spelling-hint terms are sent to Groq as a transcription hint; corrections are applied locally before the corrected transcript is sent for AI polishing. No automatic learning. Do not add secrets." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,10,0,0"/>
-      <StackPanel Orientation="Horizontal" Margin="0,14,0,0"><Button Content="Save personalization" Click="SavePersonalization"/><Button Content="Delete data" Click="DeletePersonalization" Background="#e8efe9" Foreground="#355246" Margin="10,0,0,0"/></StackPanel>
-    </StackPanel></Border>
-    <Border Background="#e7f1e6" CornerRadius="12" Padding="18" Margin="0,18,0,0"><StackPanel><TextBlock Text="HOW TO DICTATE" FontWeight="Bold" FontSize="10" Foreground="#5a7b67"/><TextBlock Text="Focus any text field. Press your shortcut to start, then press it again to finish." TextWrapping="Wrap" Margin="0,8,0,0" FontSize="13"/><TextBlock Text="Try starting with Code, Email, or Bullet to switch formats." TextWrapping="Wrap" Margin="0,7,0,0" Foreground="#63796b" FontSize="12"/></StackPanel></Border>
-    <TextBlock Text="Your key is encrypted for this Windows account. Audio and text are sent to Groq for processing." TextWrapping="Wrap" Foreground="#7a8c80" FontSize="11" Margin="0,18,0,0"/>
-    <Button Content="Quit Ivy Say" Click="Quit" Background="Transparent" Foreground="#677b6e" HorizontalAlignment="Left" Padding="0,14"/>
-  </StackPanel></ScrollViewer>
+<Window x:Class="IvySay.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ivy Say · Settings" Width="680" Height="720" MinWidth="540" MinHeight="550" WindowStartupLocation="CenterScreen" Background="#f5f7f2" Foreground="#202a28" FontFamily="Segoe UI">
+  <Grid Margin="28,24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid Margin="0,0,0,20"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal"><Border Background="#c6f2bc" CornerRadius="10" Width="38" Height="38"><TextBlock Text="✦" Foreground="#1b4635" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><StackPanel Margin="10,0,0,0" VerticalAlignment="Center"><TextBlock Text="ivy say" FontSize="18" FontWeight="Bold"/><TextBlock Text="SETTINGS" FontSize="9" FontWeight="Bold" Foreground="#718679"/></StackPanel></StackPanel>
+      <TextBlock Grid.Column="1" Text="Your voice, in flow." Foreground="#718679" VerticalAlignment="Center" FontSize="12"/>
+    </Grid>
+    <TabControl Grid.Row="1" Background="White" BorderBrush="#dfe8df" Padding="0">
+      <TabItem Header="  General  "><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="22,18,22,22">
+        <TextBlock Text="YOUR GROQ KEY" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
+        <TextBlock x:Name="KeyStatus" TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,8,0,10"/>
+        <PasswordBox x:Name="ApiKey" Padding="10" BorderBrush="#d6e2d7" FontSize="14" ToolTip="Groq API key"/>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0"><Button Content="Save key" Click="SaveKey"/><Button Content="Remove key" Click="RemoveKey" Background="#e8efe9" Foreground="#355246" Margin="8,0,0,0"/></StackPanel>
+        <Separator Margin="0,20,0,20" Background="#e2eae2"/>
+        <TextBlock Text="VOICE &amp; INPUT" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
+        <Grid Margin="0,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <StackPanel Margin="0,0,8,0"><TextBlock Text="Transcription model" FontWeight="SemiBold" Margin="0,0,0,6"/><ComboBox x:Name="Model" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Whisper large v3 · quality"/><ComboBoxItem Content="Whisper large v3 turbo · faster"/></ComboBox></StackPanel>
+          <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Spoken language" FontWeight="SemiBold" Margin="0,0,0,6"/><ComboBox x:Name="SpokenLanguage" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Auto-detect"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox></StackPanel>
+        </Grid>
+        <TextBlock Text="For mixed languages, try auto-detect; recognition is not guaranteed." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,8,0,0"/>
+        <Grid Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <StackPanel Margin="0,0,8,0"><TextBlock Text="Microphone" FontWeight="SemiBold" Margin="0,0,0,6"/><ComboBox x:Name="Microphone" Padding="8" DisplayMemberPath="Label"/></StackPanel>
+          <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Global shortcut" FontWeight="SemiBold" Margin="0,0,0,6"/><ComboBox x:Name="Shortcut" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox></StackPanel>
+        </Grid>
+        <TextBlock Text="Restart Ivy Say after changing the shortcut." Foreground="#687a70" FontSize="12" Margin="0,8,0,0"/>
+        <TextBlock Text="Spelling hints (optional)" FontWeight="SemiBold" Margin="0,16,0,6"/><TextBox x:Name="SpellingHints" MaxLength="160" Padding="8" ToolTip="Names and words to help Whisper recognize them"/>
+        <TextBlock Text="Comma-separated terms. Stored unencrypted and sent to Groq with every recording; do not enter secrets." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
+        <Separator Margin="0,20,0,20" Background="#e2eae2"/>
+        <TextBlock Text="INSERTION &amp; SECURITY" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
+        <TextBlock Text="Security level" FontWeight="SemiBold" Margin="0,12,0,6"/>
+        <ComboBox x:Name="SecurityLevel" Padding="8" SelectedIndex="1" SelectionChanged="SecurityLevelChanged"><ComboBoxItem Content="0 · No restrictions"/><ComboBoxItem Content="1 · Guarded review (recommended)"/><ComboBoxItem Content="2 · Review every dictation"/></ComboBox>
+        <TextBlock x:Name="SecurityDescription" TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,8,0,0"/>
+        <Separator Margin="0,20,0,20" Background="#e2eae2"/>
+        <TextBlock Text="FORMAT &amp; PERFORMANCE" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
+        <CheckBox x:Name="Polish" Content="Polish text with AI (enables spoken modes)" Margin="0,12,0,0"/>
+        <TextBlock Text="Turning this off skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
+        <CheckBox x:Name="WarmConnection" Content="Warm Groq connection while recording" Margin="0,14,0,0"/>
+        <TextBlock Text="Sends an extra authenticated models request when recording starts; may improve cold-start latency and uses your Groq account." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
+        <CheckBox x:Name="ShowComparison" Content="Show transcription and AI comparison after insertion" Margin="0,14,0,0"/>
+        <TextBlock Text="For testing: shows the dictation on screen until closed; Ivy Say does not save it." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem Header="  Personalization  "><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel Margin="22,18,22,22">
+        <TextBlock Text="PERSONAL VOCABULARY" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
+        <TextBlock Text="Help Ivy Say recognize the names and phrases you use most." FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"/>
+        <CheckBox x:Name="UsePersonalization" Content="Use my vocabulary and corrections" Margin="0,16,0,0"/>
+        <TextBlock Text="Vocabulary · one name or term per line" FontWeight="SemiBold" Margin="0,20,0,6"/>
+        <TextBox x:Name="Vocabulary" AcceptsReturn="True" MaxLength="1000" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8"/>
+        <TextBlock Text="Corrections · one per line" FontWeight="SemiBold" Margin="0,18,0,6"/>
+        <TextBox x:Name="Corrections" AcceptsReturn="True" MaxLength="4500" Height="120" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" ToolTip="Example: grindel wald =&gt; Grindelwald"/>
+        <TextBlock Text="Example: grindel wald =&gt; Grindelwald. Exact phrases only; always review the result." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,8,0,0"/>
+        <Border Background="#eef4ed" CornerRadius="8" Padding="12" Margin="0,16,0,0"><TextBlock Text="Saved encrypted for your Windows account. When enabled, vocabulary hints and corrected transcripts are sent to Groq. No automatic learning. Don't add secrets." TextWrapping="Wrap" Foreground="#526b5a" FontSize="12"/></Border>
+        <TextBlock Text="Up to 160 characters of whole vocabulary and spelling-hint terms are sent; put important terms first." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,10,0,0"/>
+        <StackPanel Orientation="Horizontal" Margin="0,18,0,0"><Button Content="Save personalization" Click="SavePersonalization"/><Button Content="Delete data" Click="DeletePersonalization" Background="#e8efe9" Foreground="#355246" Margin="8,0,0,0"/></StackPanel>
+      </StackPanel></ScrollViewer></TabItem>
+    </TabControl>
+    <Grid Grid.Row="2" Margin="0,16,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock Text="Audio and text are sent to Groq." TextWrapping="Wrap" Foreground="#7a8c80" FontSize="11" VerticalAlignment="Center"/>
+      <Button Grid.Column="1" Content="Save general settings" Click="SavePreferences" Margin="8,0,0,0"/>
+      <Button Grid.Column="2" Content="Quit Ivy Say" Click="Quit" Background="Transparent" Foreground="#677b6e" Margin="8,0,0,0"/>
+      <Button Grid.Column="3" Content="Close" Click="CloseSettings" Background="#e8efe9" Foreground="#355246" Margin="8,0,0,0"/>
+    </Grid>
+  </Grid>
 </Window>

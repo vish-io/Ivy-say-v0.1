@@ -81,12 +81,14 @@ public partial class MainWindow : Window
         recorder = null;
         string? recoverableText = null;
         string? formattingError = null;
+        bool allowUnsafeCopy = false;
         try
         {
             var stopwatch = Stopwatch.StartNew();
             SetStatus("Thinking…", "Transcribing your voice");
             byte[] wav = await current.StopAsync();
             var preferences = Preferences.Load();
+            allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
             string key = KeyStore.Load();
             PersonalizationData personal = new();
             if (preferences.UsePersonalization)
@@ -133,8 +135,9 @@ public partial class MainWindow : Window
                     };
                 }
             }
-            var (riskyTarget, targetUnknown) = Native.AssessTarget(target);
-            string? reviewReason = InsertionGuard.ReviewReason(recoverableText, riskyTarget, targetUnknown || targetControl == IntPtr.Zero, preferences.AlwaysReview);
+            // In unrestricted mode, skip the extra process lookup and optional review checks.
+            var (riskyTarget, targetUnknown) = allowUnsafeCopy ? (false, false) : Native.AssessTarget(target);
+            string? reviewReason = InsertionGuard.ReviewReason(recoverableText, riskyTarget, targetUnknown || targetControl == IntPtr.Zero, preferences.SecurityLevel);
             if (reviewReason != null)
             {
                 SetStatus("Review before inserting", "Nothing typed automatically");
@@ -161,7 +164,7 @@ public partial class MainWindow : Window
             if (recoverableText != null)
             {
                 SetStatus("Review dictation", "Text was not fully inserted");
-                new RecoveryWindow(recoverableText, "Text could not be fully inserted into the original window. Some text may already have been inserted.").Show();
+                new RecoveryWindow(recoverableText, "Text could not be fully inserted into the original window. Some text may already have been inserted.", allowUnsafeCopy).Show();
             }
             else ShowError(ex);
         }

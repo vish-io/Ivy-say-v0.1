@@ -11,7 +11,9 @@ internal sealed class Preferences
     public string SpellingHints { get; set; } = "";
     public string Shortcut { get; set; } = "CtrlWinSpace";
     public string? Microphone { get; set; }
+    // Legacy field retained for migrating existing settings.
     public bool AlwaysReview { get; set; }
+    public string? SecurityLevel { get; set; }
     public bool UsePersonalization { get; set; }
     public bool WarmConnection { get; set; }
     public bool ShowComparison { get; set; }
@@ -25,11 +27,19 @@ internal sealed class Preferences
             if (value.TranscriptionModel is not ("whisper-large-v3" or "whisper-large-v3-turbo")) value.TranscriptionModel = "whisper-large-v3";
             if (value.Language is not ("auto" or "en" or "hi" or "pa")) value.Language = "auto";
             if (value.SpellingHints is null || value.SpellingHints.Length > 160) value.SpellingHints = "";
+            value.SecurityLevel = NormalizeSecurityLevel(value.SecurityLevel, value.AlwaysReview);
+            value.AlwaysReview = false;
             if (value.Shortcut is not ("CtrlWinSpace" or "CtrlShiftSpace" or "AltShiftSpace")) value.Shortcut = "CtrlWinSpace";
             return value;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return new Preferences(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return new Preferences { SecurityLevel = "Guarded" }; }
     }
+    public static string NormalizeSecurityLevel(string? level, bool legacyAlwaysReview) => level switch
+    {
+        "Unrestricted" or "Guarded" or "ReviewAll" => level,
+        null => legacyAlwaysReview ? "ReviewAll" : "Guarded",
+        _ => "Guarded"
+    };
     public void Save()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);

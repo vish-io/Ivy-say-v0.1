@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using NAudio.Wave;
 
 namespace IvySay;
@@ -31,7 +32,8 @@ public partial class SettingsWindow : Window
             Microphone.SelectedItem = selected;
         }
         Polish.IsChecked = preferences.Polish;
-        AlwaysReview.IsChecked = preferences.AlwaysReview;
+        SecurityLevel.SelectedIndex = preferences.SecurityLevel switch { "Unrestricted" => 0, "ReviewAll" => 2, _ => 1 };
+        SecurityLevelChanged(SecurityLevel, null!);
         ShowComparison.IsChecked = preferences.ShowComparison;
         WarmConnection.IsChecked = preferences.WarmConnection;
         UsePersonalization.IsChecked = preferences.UsePersonalization;
@@ -43,11 +45,27 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            new Preferences { AlwaysReview = AlwaysReview.IsChecked == true, UsePersonalization = Preferences.Load().UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
+            var existing = Preferences.Load();
+            string security = SecurityLevel.SelectedIndex switch { 0 => "Unrestricted", 2 => "ReviewAll", _ => "Guarded" };
+            if (security == "Unrestricted" && existing.SecurityLevel != "Unrestricted" &&
+                MessageBox.Show("No restrictions can type generated commands, control characters, or line breaks directly into terminals and other apps. This can execute commands or send messages. Continue?", "Ivy Say · Security", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            new Preferences { SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
             MessageBox.Show("Preferences saved. Restart Ivy Say to apply shortcut changes.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }
     }
+    private void SecurityLevelChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (SecurityDescription == null) return;
+        SecurityDescription.Text = SecurityLevel.SelectedIndex switch
+        {
+            0 => "Automatic insertion without content or terminal review. Commands or line breaks may execute actions. Foreground and focus checks still apply.",
+            2 => "Every result opens for review and manual copying. Unsafe control characters cannot be copied by Ivy Say.",
+            _ => "Review known terminals, unverified targets, multiline, tabs and unsafe characters. Detection is best-effort and can miss sensitive apps."
+        };
+        SecurityDescription.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(SecurityLevel.SelectedIndex == 0 ? "#a04b35" : "#687a70"));
+    }
+    private void CloseSettings(object sender, RoutedEventArgs e) => Close();
     private void SavePersonalization(object sender, RoutedEventArgs e)
     {
         if (!personalizationReadable) { MessageBox.Show("Existing personalization could not be read. Delete it explicitly before saving a new profile.", "Ivy Say"); return; }
