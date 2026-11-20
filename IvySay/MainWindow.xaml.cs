@@ -89,7 +89,7 @@ public partial class MainWindow : Window
             var preferences = Preferences.Load();
             string key = KeyStore.Load();
             var transcriptionTimer = Stopwatch.StartNew();
-            string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, lifetime.Token);
+            string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, preferences.Language, preferences.SpellingHints, lifetime.Token);
             transcriptionTimer.Stop();
             TimeSpan? formattingTime = null;
             string? polishedText = null;

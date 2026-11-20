@@ -14,6 +14,12 @@
       <TextBlock Text="SPEED &amp; FORMATTING" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
       <TextBlock Text="Transcription model" FontWeight="SemiBold" Margin="0,10,0,6"/>
       <ComboBox x:Name="Model" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Whisper large v3 · quality"/><ComboBoxItem Content="Whisper large v3 turbo · faster"/></ComboBox>
+      <TextBlock Text="Spoken language" FontWeight="SemiBold" Margin="0,16,0,6"/>
+      <ComboBox x:Name="Language" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Auto-detect"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox>
+      <TextBlock Text="Choose the language you speak most. For mixed languages, try auto-detect; recognition is not guaranteed." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
+      <TextBlock Text="Spelling hints (optional)" FontWeight="SemiBold" Margin="0,16,0,6"/>
+      <TextBox x:Name="SpellingHints" MaxLength="160" Padding="8" ToolTip="Names and words to help Whisper recognize them"/>
+      <TextBlock Text="Comma-separated names or terms. Saved unencrypted in local preferences and sent to Groq with every recording. Do not enter secrets." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <TextBlock Text="Microphone" FontWeight="SemiBold" Margin="0,16,0,6"/>
       <ComboBox x:Name="Microphone" Padding="8" DisplayMemberPath="Label"/>
       <TextBlock Text="Choose the device you speak into, or use the Windows default." Foreground="#687a70" FontSize="12" TextWrapping="Wrap" Margin="0,7,0,0"/>

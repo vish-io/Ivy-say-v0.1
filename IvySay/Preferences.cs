@@ -7,6 +7,8 @@ namespace IvySay;
 internal sealed class Preferences
 {
     public string TranscriptionModel { get; set; } = "whisper-large-v3";
+    public string Language { get; set; } = "auto";
+    public string SpellingHints { get; set; } = "";
     public string Shortcut { get; set; } = "CtrlWinSpace";
     public string? Microphone { get; set; }
     public bool WarmConnection { get; set; }
@@ -19,6 +21,8 @@ internal sealed class Preferences
         {
             var value = JsonSerializer.Deserialize<Preferences>(File.ReadAllText(FilePath)) ?? new Preferences();
             if (value.TranscriptionModel is not ("whisper-large-v3" or "whisper-large-v3-turbo")) value.TranscriptionModel = "whisper-large-v3";
+            if (value.Language is not ("auto" or "en" or "hi" or "pa")) value.Language = "auto";
+            if (value.SpellingHints is null || value.SpellingHints.Length > 160) value.SpellingHints = "";
             if (value.Shortcut is not ("CtrlWinSpace" or "CtrlShiftSpace" or "AltShiftSpace")) value.Shortcut = "CtrlWinSpace";
             return value;
         }

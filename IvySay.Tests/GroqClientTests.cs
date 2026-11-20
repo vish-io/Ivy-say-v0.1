@@ -43,9 +43,25 @@ public class GroqClientTests
             var body = await request.Content.ReadAsStringAsync(token);
             Assert.Contains("whisper-large-v3-turbo", body);
             Assert.Contains("audio.wav", body);
+            Assert.Contains("name=language", body);
+            Assert.Contains("\r\n\r\nen\r\n", body);
+            Assert.Contains("name=prompt", body);
+            Assert.Contains("Grindelwald", body);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"text\":\" hello \"}", Encoding.UTF8, "application/json") };
         }));
-        Assert.Equal("hello", await client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3-turbo", CancellationToken.None));
+        Assert.Equal("hello", await client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3-turbo", "en", "Grindelwald", CancellationToken.None));
+    }
+    [Fact]
+    public async Task AutoLanguageAndEmptyHintsAreNotSent()
+    {
+        using var client = new GroqClient(new StubHandler(async (request, token) =>
+        {
+            var body = await request.Content!.ReadAsStringAsync(token);
+            Assert.DoesNotContain("name=language", body);
+            Assert.DoesNotContain("name=prompt", body);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"text\":\"hello\"}") };
+        }));
+        Assert.Equal("hello", await client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3", "auto", "", CancellationToken.None));
     }
     [Fact]
     public async Task FormatterSendsTranscriptAsUserData()
@@ -69,7 +85,7 @@ public class GroqClientTests
     public async Task ErrorMessageDoesNotExposeProviderBody()
     {
         using var client = new GroqClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("secret provider body") })));
-        var error = await Assert.ThrowsAsync<HttpRequestException>(() => client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3", CancellationToken.None));
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3", "auto", "", CancellationToken.None));
         Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
         Assert.DoesNotContain("secret provider body", error.Message);
         Assert.DoesNotContain("test-key", error.Message);
