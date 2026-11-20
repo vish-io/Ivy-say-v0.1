@@ -16,6 +16,7 @@ internal sealed class Preferences
     public string? SecurityLevel { get; set; }
     public bool UsePersonalization { get; set; }
     public bool WarmConnection { get; set; }
+    public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
     public bool Polish { get; set; } = true;
     private static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay", "preferences.json");

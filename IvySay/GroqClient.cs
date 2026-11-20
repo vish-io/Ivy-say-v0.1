@@ -75,6 +75,20 @@ internal sealed class GroqClient : IDisposable
         if (choice.GetProperty("finish_reason").GetString() != "stop") throw new InvalidOperationException("Formatting did not complete. Please use a shorter dictation.");
         return choice.GetProperty("message").GetProperty("content").GetString()?.Trim() ?? "";
     }
+    public async Task<string> PolishStreamingAsync(string raw, string key, Func<string, Task> onDelta, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = JsonContent.Create(new { model = "openai/gpt-oss-20b", reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = raw } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        await EnsureSuccess(response);
+        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+        return await StreamingCompletion.ReadAsync(stream, onDelta, timeout.Token);
+    }
     private static async Task<byte[]> ReadBoundedAsync(HttpContent content, int maxBytes, CancellationToken token)
     {
         if (content.Headers.ContentLength > maxBytes) throw new InvalidOperationException("Groq response was too large.");

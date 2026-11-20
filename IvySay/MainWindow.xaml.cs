@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text;
 
 namespace IvySay;
 public partial class MainWindow : Window
@@ -103,26 +104,64 @@ public partial class MainWindow : Window
             string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, preferences.Language, hints, lifetime.Token);
             transcriptionTimer.Stop();
             TimeSpan? formattingTime = null;
+            TimeSpan? firstDeltaTime = null;
             string? polishedText = null;
             if (raw.Length == 0) { SetStatus("Nothing heard", "Try speaking a little louder"); return; }
             string corrected = preferences.UsePersonalization ? PersonalizationRules.Parse(personal.Corrections).Apply(raw) : raw;
             recoverableText = corrected;
+            bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            bool directComplete = false;
             if (preferences.Polish)
             {
                 SetStatus("Thinking…", "Polishing your words");
+                bool direct = preferences.StreamDirect && allowUnsafeCopy;
+                bool directAttempted = false;
+                var streamed = new StringBuilder();
                 try
                 {
+                    if (direct)
+                    {
+                        for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
+                        if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
+                    }
                     var formattingTimer = Stopwatch.StartNew();
-                    string polished = await groq.PolishAsync(corrected, key, lifetime.Token);
+                    string polished = await groq.PolishStreamingAsync(corrected, key, fragment =>
+                    {
+                        firstDeltaTime ??= formattingTimer.Elapsed;
+                        streamed.Append(fragment);
+                        int start = Math.Max(0, streamed.Length - 90);
+                        string preview = streamed.ToString(start, streamed.Length - start).Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
+                        SetStatus(direct ? "Typing…" : "Polishing…", preview);
+                        if (direct)
+                        {
+                            if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
+                            directAttempted = true; // Even a failed call can insert part of a fragment.
+                            Native.TypeText(fragment, target, targetControl);
+                        }
+                        return Task.CompletedTask;
+                    }, lifetime.Token);
                     formattingTimer.Stop();
                     formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
-                    polishedText = polished;
-                    recoverableText = polished;
+                    if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
+                    {
+                        if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
+                        Native.TypeText(" ", target, targetControl);
+                    }
+                    directComplete = direct;
+                    polishedText = direct ? polished : polished.Trim();
+                    recoverableText = polishedText;
                 }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
+                    if (directAttempted)
+                    {
+                        SetStatus("Stream interrupted", "Check text already inserted");
+                        new RecoveryWindow(streamed.ToString(), "Streaming stopped before completion. Some or all of this partial text may already be in the original app. Check it before copying; do not blindly paste it again.", allowUnsafeCopy).Show();
+                        recoverableText = null;
+                        return;
+                    }
                     // Never display or log the provider response, transcript, or API key.
                     formattingError = ex switch
                     {
@@ -134,6 +173,14 @@ public partial class MainWindow : Window
                         _ => "Formatting error"
                     };
                 }
+            }
+            if (directComplete)
+            {
+                recoverableText = null;
+                SetStatus("AI formatted", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
+                if (preferences.ShowComparison)
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
+                return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
             var (riskyTarget, targetUnknown) = allowUnsafeCopy ? (false, false) : Native.AssessTarget(target);
@@ -149,14 +196,13 @@ public partial class MainWindow : Window
             for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
-            bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl);
             recoverableText = null;
             if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", $"{formattingError} · formatting failed");
             else if (polishedText != null) SetStatus("AI formatted", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", $"Done in {stopwatch.Elapsed.TotalSeconds:F1}s · {shortcutLabel}");
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

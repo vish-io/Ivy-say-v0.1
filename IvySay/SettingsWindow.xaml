@@ -34,6 +34,9 @@
         <TextBlock Text="FORMAT &amp; PERFORMANCE" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
         <CheckBox x:Name="Polish" Content="Polish text with AI (enables spoken modes)" Margin="0,12,0,0"/>
         <TextBlock Text="Turning this off skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
+        <TextBlock Text="Streaming output" FontWeight="SemiBold" Margin="0,16,0,6"/>
+        <ComboBox x:Name="StreamingMode" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Preview in pill, then insert when complete"/><ComboBoxItem Content="Type directly as text streams (level 0 only)"/></ComboBox>
+        <TextBlock Text="Direct streaming is riskier: partial text cannot be recalled, and line breaks may run commands or send messages. Guarded and review-all levels always use preview." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
         <CheckBox x:Name="WarmConnection" Content="Warm Groq connection while recording" Margin="0,14,0,0"/>
         <TextBlock Text="Sends an extra authenticated models request when recording starts; may improve cold-start latency and uses your Groq account." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
         <CheckBox x:Name="ShowComparison" Content="Show transcription and AI comparison after insertion" Margin="0,14,0,0"/>

@@ -2,7 +2,7 @@ using System.Windows;
 namespace IvySay;
 public partial class ComparisonWindow : Window
 {
-    public ComparisonWindow(string raw, string corrected, string? polished, string model, TimeSpan transcriptionTime, TimeSpan? formattingTime, string? error, bool polishEnabled, bool personalized)
+    public ComparisonWindow(string raw, string corrected, string? polished, string model, TimeSpan transcriptionTime, TimeSpan? formattingTime, TimeSpan? firstDeltaTime, string? error, bool polishEnabled, bool personalized)
     {
         InitializeComponent();
         RawText.Text = raw;
@@ -12,7 +12,7 @@ public partial class ComparisonWindow : Window
         {
             OutputLabel.Text = "3 · AI formatter output (inserted)";
             OutputText.Text = polished;
-            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · openai/gpt-oss-20b: {formattingTime!.Value.TotalSeconds:F2}s. The model may return text unchanged when no edit is needed.";
+            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · AI first text: {firstDeltaTime!.Value.TotalSeconds:F2}s · AI total: {formattingTime!.Value.TotalSeconds:F2}s. The model may return text unchanged when no edit is needed.";
         }
         else
         {

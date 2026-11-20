@@ -35,6 +35,7 @@ public partial class SettingsWindow : Window
         SecurityLevel.SelectedIndex = preferences.SecurityLevel switch { "Unrestricted" => 0, "ReviewAll" => 2, _ => 1 };
         SecurityLevelChanged(SecurityLevel, null!);
         ShowComparison.IsChecked = preferences.ShowComparison;
+        StreamingMode.SelectedIndex = preferences.StreamDirect ? 1 : 0;
         WarmConnection.IsChecked = preferences.WarmConnection;
         UsePersonalization.IsChecked = preferences.UsePersonalization;
         try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; Corrections.Text = data.Corrections; }
@@ -49,7 +50,9 @@ public partial class SettingsWindow : Window
             string security = SecurityLevel.SelectedIndex switch { 0 => "Unrestricted", 2 => "ReviewAll", _ => "Guarded" };
             if (security == "Unrestricted" && existing.SecurityLevel != "Unrestricted" &&
                 MessageBox.Show("No restrictions can type generated commands, control characters, or line breaks directly into terminals and other apps. This can execute commands or send messages. Continue?", "Ivy Say · Security", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            new Preferences { SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
+            if (StreamingMode.SelectedIndex == 1 && security == "Unrestricted" && (!existing.StreamDirect || existing.SecurityLevel != "Unrestricted") &&
+                MessageBox.Show("Direct streaming types partial AI output immediately. It cannot be undone automatically; a failure or focus change may leave partial text, and terminal commands may run. Enable it?", "Ivy Say · Streaming", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            new Preferences { StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
             MessageBox.Show("Preferences saved. Restart Ivy Say to apply shortcut changes.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }

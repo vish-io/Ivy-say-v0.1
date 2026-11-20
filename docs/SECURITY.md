@@ -16,6 +16,8 @@ Some IDE terminals, browsers, remote desktops, password fields, inaccessible con
 
 In guarded and review-everything modes, unexpected control characters, bidirectional override/isolate characters, and malformed surrogate pairs are not automatically inserted or copied by the app; the user can review/edit the result. Other visually deceptive Unicode and malicious instructions can still pass through. Level 0 does not apply this check. The review window is local and is not automatically saved by Ivy Say.
 
+In the default streaming-preview mode, fragments are shown in the pill but are not inserted until the response completes and the selected insertion policy has been checked. An explicitly enabled direct-streaming mode (level 0 only) types unvalidated partial model output immediately; no automatic rollback is possible. It is unsafe for terminals, sending messages, or sensitive applications. A failed stream after insertion begins shows the partial text without inserting it again. Focus checks are best-effort and do not guarantee safety.
+
 ## Provider and local data
 
 API requests use HTTPS with standard certificate validation, no automatic redirects, a shared connection pool, bounded recording size, response-size limits (256 KiB), and bounded request times including reading the body. Error bodies are not displayed. Prompt injection is not prevented by these network bounds. Groq receives recorded audio and transcripts; review its terms and retention policies.
