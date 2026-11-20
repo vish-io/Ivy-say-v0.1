@@ -15,7 +15,7 @@
       <TextBlock Text="Transcription model" FontWeight="SemiBold" Margin="0,10,0,6"/>
       <ComboBox x:Name="Model" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Whisper large v3 · quality"/><ComboBoxItem Content="Whisper large v3 turbo · faster"/></ComboBox>
       <TextBlock Text="Spoken language" FontWeight="SemiBold" Margin="0,16,0,6"/>
-      <ComboBox x:Name="Language" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Auto-detect"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox>
+      <ComboBox x:Name="SpokenLanguage" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Auto-detect"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox>
       <TextBlock Text="Choose the language you speak most. For mixed languages, try auto-detect; recognition is not guaranteed." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
       <TextBlock Text="Spelling hints (optional)" FontWeight="SemiBold" Margin="0,16,0,6"/>
       <TextBox x:Name="SpellingHints" MaxLength="160" Padding="8" ToolTip="Names and words to help Whisper recognize them"/>
