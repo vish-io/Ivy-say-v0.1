@@ -2,7 +2,7 @@ using System.Windows;
 namespace IvySay;
 public partial class ComparisonWindow : Window
 {
-    public ComparisonWindow(string raw, string corrected, string? polished, string model, TimeSpan transcriptionTime, TimeSpan? formattingTime, TimeSpan? firstDeltaTime, string? error, bool polishEnabled, bool personalized)
+    public ComparisonWindow(string raw, string corrected, string? polished, string model, TimeSpan transcriptionTime, TimeSpan? formattingTime, TimeSpan? firstDeltaTime, string? error, string formattingModel, bool usedFallback, bool polishEnabled, bool personalized)
     {
         InitializeComponent();
         RawText.Text = raw;
@@ -12,13 +12,13 @@ public partial class ComparisonWindow : Window
         {
             OutputLabel.Text = "3 · AI formatter output (inserted)";
             OutputText.Text = polished;
-            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · AI first text: {firstDeltaTime!.Value.TotalSeconds:F2}s · AI total: {formattingTime!.Value.TotalSeconds:F2}s. The model may return text unchanged when no edit is needed.";
+            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · {formattingModel}{(usedFallback ? " (fallback; times include first attempt)" : "")}: first text: {firstDeltaTime!.Value.TotalSeconds:F2}s · AI total: {formattingTime!.Value.TotalSeconds:F2}s. The model may return text unchanged when no edit is needed.";
         }
         else
         {
             OutputLabel.Text = "3 · No AI output (stage 2 inserted)";
             OutputText.Text = corrected;
-            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · " + (polishEnabled ? $"Formatting failed: {error ?? "unknown error"}." : "AI formatting is disabled in settings.");
+            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · " + (polishEnabled ? $"{(usedFallback ? "120B fallback failed" : "Formatting failed")}: {error ?? "unknown error"}." : "AI formatting is disabled in settings.");
         }
     }
     private void CloseWindow(object sender, RoutedEventArgs e) => Close();

@@ -33,6 +33,7 @@
         <Separator Margin="0,20,0,20" Background="#e2eae2"/>
         <TextBlock Text="FORMAT &amp; PERFORMANCE" Foreground="#638171" FontSize="10" FontWeight="Bold"/>
         <CheckBox x:Name="Polish" Content="Polish text with AI (enables spoken modes)" Margin="0,12,0,0"/>
+        <TextBlock Text="Uses GPT-OSS 20B first and may retry with 120B on eligible failures. The fallback can cost more and may be slower." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
         <TextBlock Text="Turning this off skips a network request and inserts the raw transcript." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="20,6,0,0"/>
         <TextBlock Text="Streaming output" FontWeight="SemiBold" Margin="0,16,0,6"/>
         <ComboBox x:Name="StreamingMode" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Preview in pill, then insert when complete"/><ComboBoxItem Content="Type directly as text streams (level 0 only)"/></ComboBox>

@@ -75,13 +75,14 @@ internal sealed class GroqClient : IDisposable
         if (choice.GetProperty("finish_reason").GetString() != "stop") throw new InvalidOperationException("Formatting did not complete. Please use a shorter dictation.");
         return choice.GetProperty("message").GetProperty("content").GetString()?.Trim() ?? "";
     }
-    public async Task<string> PolishStreamingAsync(string raw, string key, Func<string, Task> onDelta, CancellationToken cancellationToken)
+    public async Task<string> PolishStreamingAsync(string raw, string key, string model, Func<string, Task> onDelta, CancellationToken cancellationToken)
     {
+        if (model is not (FormatterRouter.Primary or FormatterRouter.Fallback)) throw new ArgumentException("Unsupported formatting model.", nameof(model));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(60));
         using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
         {
-            Content = JsonContent.Create(new { model = "openai/gpt-oss-20b", reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = raw } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
+            Content = JsonContent.Create(new { model, reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = raw } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);

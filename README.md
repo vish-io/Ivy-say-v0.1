@@ -1,6 +1,6 @@
 # Ivy Say
 
-A Windows-native, bring-your-own-key dictation MVP. Press **Ctrl + Win + Space** to start recording and again to stop (or choose another shortcut in settings). Ivy Say transcribes with Groq Whisper, formats with GPT-OSS 20B, and inserts Unicode text into the original foreground window. Start with **Code**, **Email**, or **Bullet** to change formatting. Drag the floating pill to reposition it; its gear opens settings.
+A Windows-native, bring-your-own-key dictation MVP. Press **Ctrl + Win + Space** to start recording and again to stop (or choose another shortcut in settings). Ivy Say transcribes with Groq Whisper, formats with GPT-OSS 20B (or GPT-OSS 120B on eligible failures), and inserts Unicode text into the original foreground window. Start with **Code**, **Email**, or **Bullet** to change formatting. Drag the floating pill to reposition it; its gear opens settings.
 
 ## Build and run
 
@@ -14,6 +14,12 @@ dotnet publish IvySay/IvySay.csproj -c Release -r win-x64 --self-contained false
 ```
 
 Enter the key in settings. Close the settings window, focus a text field, and use the shortcut. If Windows reports that the shortcut is unavailable, close the other application using it or choose a different shortcut in settings, then restart Ivy Say. Quit from settings. On first use, grant Windows microphone access. Recording automatically stops after 115 seconds, with a hard two-minute memory limit. Text insertion requires the target to remain foreground throughout processing and injection; elevated apps may reject input from a non-elevated Ivy Say. Some applications do not accept Unicode `SendInput` and line breaks may behave differently.
+
+## Formatter fallback
+
+AI formatting uses `openai/gpt-oss-20b` first. On a model-not-found response (404), rate limit (429), request timeout (408), server error (5xx), connection error, interrupted stream or request timeout, it tries `openai/gpt-oss-120b` once. It does not retry bad requests, authentication/permission failures, invalid output, or user cancellation. Account-wide limits, unavailable models and exhausted credits can affect both. Fallback can cost more and take longer; check your Groq plan and limits. When the fallback is used, the pill and optional comparison identify it; timing includes the first attempt. If both fail before direct insertion, the existing raw-transcript fallback is used and the pill indicates failure.
+
+In preview mode, an unfinished primary preview is discarded before retrying. In direct-typing mode, Ivy Say never retries after a fragment may have reached the app, because that risks duplicating or changing already-inserted text. Instead it stops and displays the partial result for review. Whisper transcription models and routing are unchanged.
 
 ## Streaming output
 

@@ -93,7 +93,7 @@ public class StreamingCompletionTests
     {
         using var truncated = Sse(Chunk);
         var received = new List<string>();
-        await Assert.ThrowsAsync<InvalidOperationException>(() => StreamingCompletion.ReadAsync(truncated, x => { received.Add(x); return Task.CompletedTask; }, CancellationToken.None));
+        await Assert.ThrowsAsync<IOException>(() => StreamingCompletion.ReadAsync(truncated, x => { received.Add(x); return Task.CompletedTask; }, CancellationToken.None));
         Assert.Equal(new[] { "Hello" }, received);
         using var noStop = Sse(Chunk + Done);
         await Assert.ThrowsAsync<InvalidOperationException>(() => StreamingCompletion.ReadAsync(noStop, _ => Task.CompletedTask, CancellationToken.None));
@@ -118,7 +118,7 @@ public class StreamingCompletionTests
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Chunk + Last + Done, Encoding.UTF8, "text/event-stream") };
         }));
         var seen = new List<string>();
-        string result = await client.PolishStreamingAsync("hello", "test-key", fragment => { seen.Add(fragment); return Task.CompletedTask; }, CancellationToken.None);
+        string result = await client.PolishStreamingAsync("hello", "test-key", FormatterRouter.Primary, fragment => { seen.Add(fragment); return Task.CompletedTask; }, CancellationToken.None);
         Assert.Equal("Hello world", result);
         Assert.Equal(new[] { "Hello", " world" }, seen);
     }

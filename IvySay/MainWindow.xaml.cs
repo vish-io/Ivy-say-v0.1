@@ -112,6 +112,8 @@ public partial class MainWindow : Window
             recoverableText = corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             bool directComplete = false;
+            string formattingModel = FormatterRouter.Primary;
+            bool usedFallback = false;
             FirstWordTimer? firstWordTimer = null;
             if (preferences.Polish)
             {
@@ -129,7 +131,9 @@ public partial class MainWindow : Window
                     var formattingTimer = Stopwatch.StartNew();
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
-                    string polished = await groq.PolishStreamingAsync(corrected, key, fragment =>
+                    string polished = await FormatterRouter.RunAsync(
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token),
+                        fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
                         streamed.Append(fragment);
@@ -143,7 +147,15 @@ public partial class MainWindow : Window
                             Native.TypeText(fragment, target, targetControl, currentWordTimer.Observe);
                         }
                         return Task.CompletedTask;
-                    }, lifetime.Token);
+                    },
+                    () =>
+                    {
+                        usedFallback = true;
+                        formattingModel = FormatterRouter.Fallback;
+                        streamed.Clear();
+                        firstDeltaTime = null;
+                        SetStatus("Switching model…", "Trying GPT-OSS 120B");
+                    }, direct, lifetime.Token);
                     formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
@@ -172,6 +184,7 @@ public partial class MainWindow : Window
                         HttpRequestException { StatusCode: not null } httpError => $"Groq HTTP {(int)httpError.StatusCode.Value}",
                         HttpRequestException => "Network error",
                         OperationCanceledException => "Request timed out",
+                        System.IO.IOException => "Connection interrupted",
                         JsonException or KeyNotFoundException => "Invalid Groq response",
                         InvalidOperationException => "Empty or incomplete result",
                         _ => "Formatting error"
@@ -182,9 +195,9 @@ public partial class MainWindow : Window
             {
                 _ = UsageStatistics.Default.RecordAsync(polishedText!, recordingDuration, DateTime.Now);
                 recoverableText = null;
-                SetCompletionStatus(firstWordTimer);
+                SetCompletionStatus(firstWordTimer, usedFallback);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -193,7 +206,7 @@ public partial class MainWindow : Window
             if (reviewReason != null)
             {
                 SetStatus("Review before inserting", "Nothing typed automatically");
-                new RecoveryWindow(recoverableText, reviewReason + " Copying and pasting into a terminal can execute commands; verify the text and destination first.").Show();
+                new RecoveryWindow(recoverableText, (usedFallback && polishedText != null ? "GPT-OSS 120B fallback was used. " : "") + reviewReason + " Copying and pasting into a terminal can execute commands; verify the text and destination first.").Show();
                 recoverableText = null;
                 return;
             }
@@ -205,11 +218,11 @@ public partial class MainWindow : Window
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
-            if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", $"{formattingError} · formatting failed");
-            else if (polishedText != null) SetCompletionStatus(firstWordTimer);
+            if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · 120B failed" : $"{formattingError} · formatting failed");
+            else if (polishedText != null) SetCompletionStatus(firstWordTimer, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, preferences.Polish, preferences.UsePersonalization).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)
@@ -224,10 +237,10 @@ public partial class MainWindow : Window
         finally { current.Dispose(); busy = false; }
     }
 
-    private void SetCompletionStatus(FirstWordTimer? timer)
+    private void SetCompletionStatus(FirstWordTimer? timer, bool usedFallback)
     {
-        if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", "AI start → first word");
-        else SetStatus("AI formatted", "No measurable first word");
+        if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", usedFallback ? "First word · 120B fallback" : "AI start → first word");
+        else SetStatus("AI formatted", usedFallback ? "120B fallback used" : "No measurable first word");
     }
     private void SetStatus(string title, string detail) { StatusTitle.Text = title; StatusDetail.Text = detail; }
     private void ShowError(Exception ex)

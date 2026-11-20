@@ -70,7 +70,8 @@ internal static class StreamingCompletion
                 else { if (line.Length >= MaxEventChars) throw new InvalidOperationException("Formatting event was too large."); line.Append(buffer[i]); }
             }
         }
-        if (!done || !finished || string.IsNullOrWhiteSpace(output.ToString())) throw new InvalidOperationException("Formatting stream ended before completion.");
+        if (!done) throw new IOException("Formatting stream was interrupted.");
+        if (!finished || string.IsNullOrWhiteSpace(output.ToString())) throw new InvalidOperationException("Formatting stream ended before completion.");
         return output.ToString();
     }
 }
