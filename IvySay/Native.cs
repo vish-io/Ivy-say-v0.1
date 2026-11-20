@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace IvySay;
 internal static class Native
@@ -25,6 +26,18 @@ internal static class Native
         if (thread == 0) return IntPtr.Zero;
         var info = new GUITHREADINFO { size = (uint)Marshal.SizeOf<GUITHREADINFO>() };
         return GetGUIThreadInfo(thread, ref info) ? info.focus : IntPtr.Zero;
+    }
+    public static (bool risky, bool unknown) AssessTarget(IntPtr window)
+    {
+        if (window == IntPtr.Zero || GetWindowThreadProcessId(window, out uint pid) == 0 || pid == 0) return (false, true);
+        try
+        {
+            using var process = Process.GetProcessById(checked((int)pid));
+            string name = process.ProcessName;
+            string[] consoles = { "WindowsTerminal", "WindowsTerminalPreview", "OpenConsole", "conhost", "cmd", "powershell", "pwsh", "wsl", "bash", "mintty", "putty", "wezterm-gui", "alacritty", "kitty", "ConEmu64", "ConEmu", "wt" };
+            return (consoles.Any(item => string.Equals(item, name, StringComparison.OrdinalIgnoreCase)), false);
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception or OverflowException or NotSupportedException) { return (false, true); }
     }
     [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint count, INPUT[] inputs, int size);
     [StructLayout(LayoutKind.Sequential)] private struct INPUT { public uint type; public InputUnion data; }

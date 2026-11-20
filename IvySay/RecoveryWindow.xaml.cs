@@ -10,6 +10,8 @@ public partial class RecoveryWindow : Window
     }
     private void CopyText(object sender, RoutedEventArgs e)
     {
+        if (InsertionGuard.HasUnsafeCharacters(ResultText.Text)) { MessageBox.Show("This text contains unsafe control characters. Remove them before copying.", "Ivy Say"); return; }
+        if (string.IsNullOrEmpty(ResultText.Text)) return;
         try { Clipboard.SetText(ResultText.Text); }
         catch (System.Runtime.InteropServices.ExternalException) { MessageBox.Show("The clipboard is busy. Please try again.", "Ivy Say"); }
     }

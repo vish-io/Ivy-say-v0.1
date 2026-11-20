@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/IvySay"
+    schedule:
+      interval: weekly
+  - package-ecosystem: nuget
+    directory: "/IvySay.Tests"
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

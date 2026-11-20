@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -33,11 +34,13 @@ internal sealed class GroqClient : IDisposable
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "models");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseContentRead, timeout.Token);
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            if (response.IsSuccessStatusCode) await ReadBoundedAsync(response.Content, 256 * 1024, timeout.Token);
         }
         catch (HttpRequestException) { }
         catch (OperationCanceledException) { }
         catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
     }
     public async Task<string> TranscribeAsync(byte[] wav, string key, string model, string language, string spellingHints, CancellationToken cancellationToken)
     {
@@ -49,24 +52,43 @@ internal sealed class GroqClient : IDisposable
         audio.Add(new StringContent("json"), "response_format");
         if (language is "en" or "hi" or "pa") audio.Add(new StringContent(language), "language");
         if (!string.IsNullOrWhiteSpace(spellingHints)) audio.Add(new StringContent(spellingHints), "prompt");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
         using var transcriptionRequest = new HttpRequestMessage(HttpMethod.Post, "audio/transcriptions") { Content = audio };
         transcriptionRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        using var transcription = await http.SendAsync(transcriptionRequest, cancellationToken);
+        using var transcription = await http.SendAsync(transcriptionRequest, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         await EnsureSuccess(transcription);
-        using var result = JsonDocument.Parse(await transcription.Content.ReadAsStringAsync(cancellationToken));
+        using var result = JsonDocument.Parse(await ReadBoundedAsync(transcription.Content, 256 * 1024, timeout.Token));
         string raw = result.RootElement.GetProperty("text").GetString()?.Trim() ?? "";
         return raw;
     }
     public async Task<string> PolishAsync(string raw, string key, CancellationToken cancellationToken)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
         using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions") { Content = JsonContent.Create(new { model = "openai/gpt-oss-20b", reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = raw } }, temperature = 0.1, max_completion_tokens = 2048 }) };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         await EnsureSuccess(response);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        using var json = JsonDocument.Parse(await ReadBoundedAsync(response.Content, 256 * 1024, timeout.Token));
         var choice = json.RootElement.GetProperty("choices")[0];
-        if (choice.GetProperty("finish_reason").GetString() == "length") throw new InvalidOperationException("The formatted result was too long. Please use a shorter dictation.");
+        if (choice.GetProperty("finish_reason").GetString() != "stop") throw new InvalidOperationException("Formatting did not complete. Please use a shorter dictation.");
         return choice.GetProperty("message").GetProperty("content").GetString()?.Trim() ?? "";
+    }
+    private static async Task<byte[]> ReadBoundedAsync(HttpContent content, int maxBytes, CancellationToken token)
+    {
+        if (content.Headers.ContentLength > maxBytes) throw new InvalidOperationException("Groq response was too large.");
+        await using var stream = await content.ReadAsStreamAsync(token);
+        using var output = new MemoryStream();
+        byte[] buffer = new byte[8192];
+        while (true)
+        {
+            int read = await stream.ReadAsync(buffer.AsMemory(), token);
+            if (read == 0) break;
+            if (output.Length + read > maxBytes) throw new InvalidOperationException("Groq response was too large.");
+            output.Write(buffer, 0, read);
+        }
+        return output.ToArray();
     }
     private static Task EnsureSuccess(HttpResponseMessage response)
     {

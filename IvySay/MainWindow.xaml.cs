@@ -133,6 +133,15 @@ public partial class MainWindow : Window
                     };
                 }
             }
+            var (riskyTarget, targetUnknown) = Native.AssessTarget(target);
+            string? reviewReason = InsertionGuard.ReviewReason(recoverableText, riskyTarget, targetUnknown || targetControl == IntPtr.Zero, preferences.AlwaysReview);
+            if (reviewReason != null)
+            {
+                SetStatus("Review before inserting", "Nothing typed automatically");
+                new RecoveryWindow(recoverableText, reviewReason + " Copying and pasting into a terminal can execute commands; verify the text and destination first.").Show();
+                recoverableText = null;
+                return;
+            }
             // Do not inject while modifiers from the shortcut are still held.
             for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");

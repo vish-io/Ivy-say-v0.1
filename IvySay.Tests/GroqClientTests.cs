@@ -102,6 +102,18 @@ public class GroqClientTests
         Assert.DoesNotContain("test-key", error.Message);
     }
     [Fact]
+    public async Task OversizedProviderResponseIsRejected()
+    {
+        using var client = new GroqClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('x', 300_000)) })));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.TranscribeAsync(new byte[] { 1, 2 }, "test-key", "whisper-large-v3", "auto", "", CancellationToken.None));
+    }
+    [Fact]
+    public async Task UnexpectedFormatterFinishIsRejected()
+    {
+        using var client = new GroqClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"finish_reason\":\"tool_calls\",\"message\":{\"content\":\"danger\"}}]}") })));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.PolishAsync("speech", "test-key", CancellationToken.None));
+    }
+    [Fact]
     public async Task TruncatedFormatterOutputIsRejected()
     {
         using var client = new GroqClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"content\":\"incomplete\"}}]}") })));
