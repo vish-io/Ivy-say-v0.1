@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using IvySay;
 using Xunit;
 
@@ -70,13 +71,23 @@ public class GroqClientTests
         {
             Assert.EndsWith("/chat/completions", request.RequestUri!.AbsolutePath);
             string body = await request.Content!.ReadAsStringAsync(token);
-            Assert.Contains("openai/gpt-oss-20b", body);
-            Assert.Contains("\"reasoning_effort\":\"low\"", body);
-            Assert.Contains("\"reasoning_format\":\"hidden\"", body);
-            Assert.Contains("\"max_completion_tokens\":2048", body);
-            Assert.Contains("Bullet buy milk", body);
-            Assert.Contains("self-corrections", body);
-            Assert.Contains("accent-related", body);
+            using var payload = JsonDocument.Parse(body);
+            var root = payload.RootElement;
+            Assert.Equal("openai/gpt-oss-20b", root.GetProperty("model").GetString());
+            Assert.Equal("low", root.GetProperty("reasoning_effort").GetString());
+            Assert.Equal("hidden", root.GetProperty("reasoning_format").GetString());
+            Assert.Equal(2048, root.GetProperty("max_completion_tokens").GetInt32());
+            var messages = root.GetProperty("messages");
+            Assert.Equal(2, messages.GetArrayLength());
+            Assert.Equal("system", messages[0].GetProperty("role").GetString());
+            string prompt = messages[0].GetProperty("content").GetString()!;
+            Assert.True(prompt.Length < 2000, "The formatter prompt should remain compact.");
+            Assert.Contains("self-corrections", prompt);
+            Assert.Contains("accent-related", prompt);
+            Assert.Contains("Only an opening command", prompt);
+            Assert.Contains("do not answer questions", prompt);
+            Assert.Equal("user", messages[1].GetProperty("role").GetString());
+            Assert.Equal("Bullet buy milk", messages[1].GetProperty("content").GetString());
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"- Buy milk\"}}]}", Encoding.UTF8, "application/json") };
         }));
         Assert.Equal("- Buy milk", await client.PolishAsync("Bullet buy milk", "test-key", CancellationToken.None));

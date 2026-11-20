@@ -37,7 +37,7 @@ Vocabulary and corrections are encrypted at rest using Windows DPAPI for the cur
 
 ## Tests and delivery
 
-Run `dotnet test IvySay.Tests/IvySay.Tests.csproj` to test the WAV encoder and Groq request handling with a fake HTTP handler. The Windows GitHub Actions workflow builds, tests, and publishes a self-contained x64 artifact. The artifact is not signed and is not a production release. Follow [the manual test checklist](docs/TESTING.md) on a Windows machine before distributing it.
+Run `dotnet test IvySay.Tests/IvySay.Tests.csproj` to test the WAV encoder and Groq request handling with a fake HTTP handler. The Windows GitHub Actions workflow builds, tests, and publishes a self-contained x64 artifact. The artifact is not signed and is not a production release. Follow [the manual test checklist](docs/TESTING.md) and [formatter evaluation guide](docs/FORMATTER_EVALUATION.md) on a Windows machine before distributing it.
 
 ## Privacy and security
 
