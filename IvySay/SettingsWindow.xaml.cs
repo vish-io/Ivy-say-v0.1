@@ -9,7 +9,7 @@ public partial class SettingsWindow : Window
     private sealed record MicrophoneOption(string Label, string? DeviceName);
     public SettingsWindow()
     {
-        InitializeComponent(); RefreshStatus(); RefreshStats();
+        InitializeComponent(); RefreshStatus(); RefreshStats(); KeySection.IsExpanded = !KeyStore.Exists;
         var preferences = Preferences.Load();
         SpokenLanguage.SelectedIndex = preferences.Language switch { "en" => 1, "hi" => 2, "pa" => 3, _ => 0 };
         SpellingHints.Text = preferences.SpellingHints;
@@ -17,7 +17,7 @@ public partial class SettingsWindow : Window
         EnableChunking.IsChecked = preferences.EnableChunking;
         ChunkThreshold.Text = preferences.ChunkThresholdSeconds.ToString();
         Model.SelectedIndex = preferences.TranscriptionModel == "whisper-large-v3-turbo" ? 1 : 0;
-        Microphone.Items.Add(new MicrophoneOption("Windows default (may change after restart)", null));
+        Microphone.Items.Add(new MicrophoneOption("Use Windows default", null));
         for (int i = 0; i < WaveIn.DeviceCount; i++)
         {
             string name = WaveIn.GetCapabilities(i).ProductName;
@@ -60,7 +60,9 @@ public partial class SettingsWindow : Window
             if (StreamingMode.SelectedIndex == 1 && security == "Unrestricted" && (!existing.StreamDirect || existing.SecurityLevel != "Unrestricted") &&
                 MessageBox.Show("Direct streaming types partial AI output immediately. It cannot be undone automatically; a failure or focus change may leave partial text, and terminal commands may run. Enable it?", "Ivy Say · Streaming", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             new Preferences { SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
-            MessageBox.Show("Preferences saved. Restart Ivy Say to apply shortcut changes.", "Ivy Say");
+            MessageBox.Show(existing.Shortcut != (Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" })
+                ? "Settings saved. Restart Ivy Say to use your new shortcut."
+                : "Settings saved.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }
     }
@@ -69,11 +71,17 @@ public partial class SettingsWindow : Window
         if (SecurityDescription == null) return;
         SecurityDescription.Text = SecurityLevel.SelectedIndex switch
         {
-            0 => "Automatic insertion without content or terminal review. Commands or line breaks may execute actions. Foreground and focus checks still apply.",
-            2 => "Every result opens for review and manual copying. Unsafe control characters cannot be copied by Ivy Say.",
-            _ => "Review known terminals, unverified targets, multiline, tabs and unsafe characters. Detection is best-effort and can miss sensitive apps."
+            0 => "Text is typed without safety review. Commands and line breaks may trigger actions.",
+            2 => "Review and copy each result yourself. Unsafe characters are blocked from copying.",
+            _ => "Some text and destinations are held for review. These checks can miss risks."
         };
         SecurityDescription.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(SecurityLevel.SelectedIndex == 0 ? "#a04b35" : "#687a70"));
+    }
+    private void SettingsTabChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (SettingsTabs == null || GeneralSettingsSave == null || e.Source != SettingsTabs) return;
+        // Personal words have their own explicit save/delete actions.
+        GeneralSettingsSave.Visibility = SettingsTabs.SelectedIndex == 1 ? Visibility.Collapsed : Visibility.Visible;
     }
     private void CloseSettings(object sender, RoutedEventArgs e) => Close();
     private void RefreshStats()
@@ -82,7 +90,7 @@ public partial class SettingsWindow : Window
         {
             double? average = UsageStatistics.Default.SevenDayAverage(DateTime.Now);
             StatsValue.Text = average.HasValue ? $"{average.Value:F0} WPM" : "— WPM";
-            StatsDetail.Text = average.HasValue ? "Output words ÷ recording time · successful insertions" : "No successful dictations recorded in the last 7 days.";
+            StatsDetail.Text = average.HasValue ? "Average words per minute" : "Your average will appear after you start dictating.";
         }
         catch { StatsValue.Text = "— WPM"; StatsDetail.Text = "Statistics unavailable on this device."; }
     }
@@ -122,12 +130,12 @@ public partial class SettingsWindow : Window
     {
         string key = ApiKey.Password.Trim();
         if (key.Length < 10 || key.Length > 512 || key.Any(char.IsWhiteSpace) || key.Any(char.IsControl)) { MessageBox.Show("Enter a valid Groq API key without spaces.", "Ivy Say"); return; }
-        try { KeyStore.Save(key); ApiKey.Clear(); RefreshStatus(); MessageBox.Show("Key saved securely.", "Ivy Say"); }
+        try { KeyStore.Save(key); ApiKey.Clear(); RefreshStatus(); KeySection.IsExpanded = false; MessageBox.Show("Key saved securely.", "Ivy Say"); }
         catch { MessageBox.Show("Could not securely save the key for this Windows account.", "Ivy Say"); }
     }
     private void RemoveKey(object sender, RoutedEventArgs e)
     {
-        try { KeyStore.Delete(); ApiKey.Clear(); RefreshStatus(); }
+        try { KeyStore.Delete(); ApiKey.Clear(); RefreshStatus(); KeySection.IsExpanded = true; }
         catch { MessageBox.Show("Could not remove the saved key.", "Ivy Say"); }
     }
     private void Quit(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
