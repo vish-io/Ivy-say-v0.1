@@ -1,4 +1,4 @@
-<Window x:Class="IvySay.ComparisonWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ivy Say · Pipeline comparison" Width="650" Height="700" MinWidth="500" MinHeight="520" WindowStartupLocation="CenterScreen" Background="#f5f7f2" FontFamily="Segoe UI">
+<Window Icon="/IvySay;component/IvySay.ico" x:Class="IvySay.ComparisonWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Ivy Say · Pipeline comparison" Width="650" Height="700" MinWidth="500" MinHeight="520" WindowStartupLocation="CenterScreen" Background="#f5f7f2" FontFamily="Segoe UI">
   <Grid Margin="28">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <TextBlock Text="Your dictation pipeline" FontSize="23" FontWeight="SemiBold" Foreground="#202a28"/>

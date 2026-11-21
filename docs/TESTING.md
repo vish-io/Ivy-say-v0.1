@@ -65,3 +65,7 @@ On Windows, inspect General, My words and Advanced at 100%, 125%, 150%, 175% and
 ## Dark floating pill
 
 On Windows, visually check the dark frosted tile, moving ice-blue rim and bloom against the reference, at 100–200% DPI and across monitors. Verify the existing Uiverse orb still animates and is not clipped, the status and shortcut remain legible for idle, listening, processing, completion and errors, the settings button opens Settings, and dragging the pill works without interfering with the button or stealing the dictation target. Confirm the transparent glow margin does not cover nearby controls more than expected. Automated build/tests do not validate the visual result or actual focus.
+
+## Icon and themed dialogs
+
+Check the Ivy Say icon on the executable, taskbar, Alt+Tab and Settings title bar on Windows. Windows may cache an old taskbar icon; unpin/re-pin after updating if needed. In Settings, test Clear stats and Delete my words with Yes, No, X, Escape, and Enter: only explicit Yes should clear data. Test the security and direct-streaming warnings, error/OK messages, and duplicate-instance prompt, including keyboard-only access, long text, DPI scaling and topmost pill interaction. Confirm dialogs stay on screen, are readable, and closing a dialog does not quit the application unexpectedly. Windows CI includes an off-screen rendering and button-result smoke test, not a full desktop or accessibility test.

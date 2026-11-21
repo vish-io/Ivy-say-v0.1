@@ -39,7 +39,7 @@ public partial class ComparisonWindow : Window
             player.Init(reader);
             player.Play();
         }
-        catch { StopPlayback(); MessageBox.Show("Could not play the captured audio. Check your Windows output device.", "Ivy Say"); }
+        catch { StopPlayback(); IvyDialog.Show("Could not play the captured audio. Check your Windows output device.", "Ivy Say"); }
     }
     private void StopAudio(object sender, RoutedEventArgs e) => StopPlayback();
     private void StopPlayback() { player?.Stop(); player?.Dispose(); player = null; reader?.Dispose(); reader = null; }

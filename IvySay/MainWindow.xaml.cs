@@ -282,7 +282,7 @@ public partial class MainWindow : Window
     private void ShowError(Exception ex)
     {
         SetStatus("Could not complete", "See the message for details");
-        MessageBox.Show(ex is InvalidOperationException ? ex.Message : "Something went wrong. Check microphone permissions, your key, and network connection.", "Ivy Say", MessageBoxButton.OK, MessageBoxImage.Warning);
+        IvyDialog.Show(ex is InvalidOperationException ? ex.Message : "Something went wrong. Check microphone permissions, your key, and network connection.", "Ivy Say", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
     private void OpenSettings(object sender, RoutedEventArgs e) => ShowSettings();
     private void ShowSettings()

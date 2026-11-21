@@ -8,7 +8,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         instance = new System.Threading.Mutex(true, @"Local\IvySay.SingleInstance", out bool created);
-        if (!created) { MessageBox.Show("Ivy Say is already running.", "Ivy Say"); Shutdown(); return; }
+        if (!created) { IvyDialog.Show("Ivy Say is already running.", "Ivy Say"); Shutdown(); return; }
         var window = new MainWindow();
         MainWindow = window;
         window.Show();

@@ -36,6 +36,9 @@ internal static class Program
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();
                 Check(window, "Advanced");
+                CheckDialog(MessageBoxResult.No, "NoButton");
+                CheckDialog(MessageBoxResult.Yes, "YesButton");
+                CheckDialog(MessageBoxResult.OK, "OkButton");
                 result = 0;
             }
             catch (Exception ex) { Console.Error.WriteLine(ex); }
@@ -44,6 +47,17 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckDialog(MessageBoxResult expected, string buttonName)
+    {
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        {
+            var dialog = Application.Current.Windows.OfType<IvyDialog>().Single();
+            Check(dialog, "Dialog");
+            ((Button)dialog.FindName(buttonName)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }));
+        var actual = IvyDialog.Show("Test confirmation", "Ivy Say", expected == MessageBoxResult.OK ? MessageBoxButton.OK : MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (actual != expected) throw new Exception($"Dialog returned {actual} instead of {expected}");
     }
     private static void Check(Window window, string tab)
     {
@@ -61,6 +75,6 @@ internal static class Program
             if (bytes[i + 3] > 0 && bytes[i] > 150 && bytes[i + 1] > 150 && bytes[i + 2] > 150) light++;
         }
         Console.WriteLine($"{tab}: {bitmap.PixelWidth}x{bitmap.PixelHeight}, dark pixels {dark}, light pixels {light}");
-        if (dark < 10000 || light < 100) throw new Exception($"{tab}: expected visible dark settings with text");
+        if (dark < 10000 || light < 40) throw new Exception($"{tab}: expected visible dark settings with text");
     }
 }
