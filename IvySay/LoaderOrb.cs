@@ -56,7 +56,7 @@ public sealed class LoaderOrb : UserControl
             OpacityMask = new VisualBrush(mask) { Stretch = Stretch.Fill }
         };
         orb.Children.Add(shape);
-        Content = new Viewbox { Width = 40, Height = 40, Stretch = Stretch.Uniform, Child = orb };
+        Content = new Viewbox { Stretch = Stretch.Uniform, Child = orb };
         Loaded += (_, _) => StartAnimation();
         Unloaded += (_, _) => StopAnimation();
     }
