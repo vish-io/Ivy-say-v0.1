@@ -24,6 +24,11 @@ internal static class Program
             try
             {
                 Check(window, "General");
+                var language = (ComboBox)window.FindName("SpokenLanguage");
+                language.IsDropDownOpen = true;
+                window.UpdateLayout();
+                language.IsDropDownOpen = false;
+                window.UpdateLayout();
                 var tabs = (TabControl)window.FindName("SettingsTabs");
                 tabs.SelectedIndex = 1;
                 window.UpdateLayout();
