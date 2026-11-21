@@ -123,4 +123,83 @@ public class FormatterRouterTests
         Assert.Equal("Ready", result);
         Assert.Equal(new[] { FormatterRouter.Primary, FormatterRouter.Fallback }, models);
     }
+    [Fact]
+    public async Task Selected120BUses20BOnEligibleFailureAndClearsPreview()
+    {
+        var calls = new List<string>();
+        var preview = new StringBuilder();
+        string result = await FormatterRouter.RunAsync(async (model, callback, _) =>
+        {
+            calls.Add(model);
+            if (model == FormatterRouter.Fallback) { await callback("partial"); throw new IOException("stream failed"); }
+            await callback("complete"); return "complete";
+        }, fragment => { preview.Append(fragment); return Task.CompletedTask; }, () => preview.Clear(), false, CancellationToken.None, FormatterRouter.Fallback);
+        Assert.Equal(new[] { FormatterRouter.Fallback, FormatterRouter.Primary }, calls);
+        Assert.Equal("complete", preview.ToString());
+        Assert.Equal("complete", result);
+    }
+    [Fact]
+    public async Task Selected120BDoesNotRetryAfterDirectOutput()
+    {
+        int calls = 0;
+        await Assert.ThrowsAsync<IOException>(() => FormatterRouter.RunAsync(async (_, callback, _) =>
+        {
+            calls++; await callback("partial"); throw new IOException();
+        }, _ => Task.CompletedTask, () => throw new Exception("must not retry"), true, CancellationToken.None, FormatterRouter.Fallback));
+        Assert.Equal(1, calls);
+    }
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.BadRequest)]
+    public async Task Selected120BDoesNotRetryNonEligibleErrors(HttpStatusCode code)
+    {
+        int calls = 0;
+        await Assert.ThrowsAsync<HttpRequestException>(() => FormatterRouter.RunAsync((_, _, _) =>
+        {
+            calls++; throw new HttpRequestException("error", null, code);
+        }, _ => Task.CompletedTask, () => { }, false, CancellationToken.None, FormatterRouter.Fallback));
+        Assert.Equal(1, calls);
+    }
+    [Fact]
+    public async Task Selected120BDoesNotRetryAfterCancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        int calls = 0;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => FormatterRouter.RunAsync((_, _, _) =>
+        {
+            calls++; cts.Cancel(); throw new OperationCanceledException();
+        }, _ => Task.CompletedTask, () => { }, false, cts.Token, FormatterRouter.Fallback));
+        Assert.Equal(1, calls);
+    }
+    [Fact]
+    public async Task UnsupportedInitialModelIsRejectedBeforeRequest()
+    {
+        int calls = 0;
+        await Assert.ThrowsAsync<ArgumentException>(() => FormatterRouter.RunAsync((_, _, _) => { calls++; return Task.FromResult("x"); }, _ => Task.CompletedTask, () => { }, false, CancellationToken.None, "unsupported"));
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task SmartChoiceFeedsActualFirstRequestAndCanFallback()
+    {
+        var choice = FormatterSelection.Select("Use method Y, no, use method X.", true, 120);
+        var models = new List<string>();
+        using var client = new GroqClient(new StubHandler(async (request, token) =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+            string model = body.RootElement.GetProperty("model").GetString()!;
+            models.Add(model);
+            Assert.Equal("low", body.RootElement.GetProperty("reasoning_effort").GetString());
+            if (model == FormatterRouter.Fallback) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            string sse = "data: {\"choices\":[{\"delta\":{\"content\":\"Use method X.\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n";
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(sse, Encoding.UTF8, "text/event-stream") };
+        }));
+        bool switched = false;
+        string result = await FormatterRouter.RunAsync((model, cb, token) => client.PolishStreamingAsync("Use method Y, no, use method X.", "test-key", model, cb, token), _ => Task.CompletedTask, () => switched = true, false, CancellationToken.None, choice.Model);
+        Assert.Equal("Use method X.", result);
+        Assert.True(switched);
+        Assert.Equal(new[] { FormatterRouter.Fallback, FormatterRouter.Primary }, models);
+    }
+
 }

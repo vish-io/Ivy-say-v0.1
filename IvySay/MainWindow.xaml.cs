@@ -126,7 +126,8 @@ public partial class MainWindow : Window
             recoverableText = corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             bool directComplete = false;
-            string formattingModel = FormatterRouter.Primary;
+            var formatterChoice = FormatterSelection.Select(raw, preferences.SmartFormatterRouting, preferences.FormatterWordThreshold);
+            string formattingModel = formatterChoice.Model;
             bool usedFallback = false;
             FirstWordTimer? firstWordTimer = null;
             if (preferences.Polish)
@@ -165,11 +166,11 @@ public partial class MainWindow : Window
                     () =>
                     {
                         usedFallback = true;
-                        formattingModel = FormatterRouter.Fallback;
+                        formattingModel = FormatterRouter.OtherModel(formatterChoice.Model);
                         streamed.Clear();
                         firstDeltaTime = null;
-                        SetStatus("Switching model…", "Trying GPT-OSS 120B");
-                    }, direct, lifetime.Token);
+                        SetStatus("Switching model…", $"Trying {ModelLabel(formattingModel)}");
+                    }, direct, lifetime.Token, formatterChoice.Model);
                     formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
@@ -209,9 +210,9 @@ public partial class MainWindow : Window
             {
                 _ = UsageStatistics.Default.RecordAsync(polishedText!, recordingDuration, DateTime.Now);
                 recoverableText = null;
-                SetCompletionStatus(firstWordTimer, usedFallback);
+                SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)").Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -220,7 +221,7 @@ public partial class MainWindow : Window
             if (reviewReason != null)
             {
                 SetStatus("Review before inserting", "Nothing typed automatically");
-                new RecoveryWindow(recoverableText, (usedFallback && polishedText != null ? "GPT-OSS 120B fallback was used. " : "") + reviewReason + " Copying and pasting into a terminal can execute commands; verify the text and destination first.").Show();
+                new RecoveryWindow(recoverableText, (usedFallback && polishedText != null ? $"{ModelLabel(formattingModel)} fallback was used. " : "") + reviewReason + " Copying and pasting into a terminal can execute commands; verify the text and destination first.").Show();
                 recoverableText = null;
                 return;
             }
@@ -232,11 +233,11 @@ public partial class MainWindow : Window
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
-            if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · 120B failed" : $"{formattingError} · formatting failed");
-            else if (polishedText != null) SetCompletionStatus(firstWordTimer, usedFallback);
+            if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · {ModelLabel(formattingModel)} failed" : $"{formattingError} · formatting failed");
+            else if (polishedText != null) SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)").Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)
@@ -251,10 +252,12 @@ public partial class MainWindow : Window
         finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; current.Dispose(); busy = false; }
     }
 
-    private void SetCompletionStatus(FirstWordTimer? timer, bool usedFallback)
+    private static string ModelLabel(string model) => model == FormatterRouter.Fallback ? "GPT-OSS 120B" : "GPT-OSS 20B";
+    private void SetCompletionStatus(FirstWordTimer? timer, string model, bool usedFallback)
     {
-        if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", usedFallback ? "First word · 120B fallback" : "AI start → first word");
-        else SetStatus("AI formatted", usedFallback ? "120B fallback used" : "No measurable first word");
+        string detail = (model == FormatterRouter.Fallback ? "120B" : "20B") + (usedFallback ? " fallback" : "");
+        if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", $"{detail} · AI → first word");
+        else SetStatus("AI formatted", detail);
     }
     private void SetStatus(string title, string detail) { StatusTitle.Text = title; StatusDetail.Text = detail; }
     private void ShowError(Exception ex)

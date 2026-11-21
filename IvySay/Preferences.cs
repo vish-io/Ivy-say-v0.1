@@ -21,6 +21,8 @@ internal sealed class Preferences
     public int CompressionKbps { get; set; }
     public int ChunkThresholdSeconds { get; set; } = 14;
     public bool EnableChunking { get; set; } = true;
+    public bool SmartFormatterRouting { get; set; } = true;
+    public int FormatterWordThreshold { get; set; } = 120;
     public bool Polish { get; set; } = true;
     private static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay", "preferences.json");
     public static Preferences Load()
@@ -33,6 +35,7 @@ internal sealed class Preferences
             if (value.SpellingHints is null || value.SpellingHints.Length > 160) value.SpellingHints = "";
             if (value.CompressionKbps is not (0 or 24 or 32 or 48)) value.CompressionKbps = 0;
             if (value.ChunkThresholdSeconds < 14 || value.ChunkThresholdSeconds > 120) value.ChunkThresholdSeconds = 14;
+            if (value.FormatterWordThreshold is < 20 or > 500) value.FormatterWordThreshold = 120;
             value.SecurityLevel = NormalizeSecurityLevel(value.SecurityLevel, value.AlwaysReview);
             value.AlwaysReview = false;
             if (value.Shortcut is not ("CtrlWinSpace" or "CtrlShiftSpace" or "AltShiftSpace")) value.Shortcut = "CtrlWinSpace";

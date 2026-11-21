@@ -9,13 +9,21 @@ internal static class FormatterRouter
 {
     public const string Primary = "openai/gpt-oss-20b";
     public const string Fallback = "openai/gpt-oss-120b";
+    public static string OtherModel(string selected) => selected switch
+    {
+        Primary => Fallback,
+        Fallback => Primary,
+        _ => throw new ArgumentException("Unsupported formatter model.", nameof(selected))
+    };
     public static async Task<string> RunAsync(
         Func<string, Func<string, Task>, CancellationToken, Task<string>> invoke,
         Func<string, Task> onDelta,
         Action onFallback,
         bool directTyping,
-        CancellationToken token)
+        CancellationToken token,
+        string initialModel = Primary)
     {
+        string alternateModel = OtherModel(initialModel);
         bool directOutputPossible = false;
         async Task Forward(string text)
         {
@@ -23,12 +31,12 @@ internal static class FormatterRouter
             if (directTyping && text.Length > 0) directOutputPossible = true;
             await onDelta(text);
         }
-        try { return await invoke(Primary, Forward, token); }
+        try { return await invoke(initialModel, Forward, token); }
         catch (Exception ex) when (!token.IsCancellationRequested && !directOutputPossible && IsRetryable(ex))
         {
             token.ThrowIfCancellationRequested();
             onFallback();
-            return await invoke(Fallback, Forward, token);
+            return await invoke(alternateModel, Forward, token);
         }
     }
     private static bool IsRetryable(Exception ex) => ex switch
