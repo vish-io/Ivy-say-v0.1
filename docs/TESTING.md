@@ -1,6 +1,6 @@
 # Windows acceptance checklist
 
-Use a test Groq account and non-sensitive sample text. Automated tests cover the WAV encoder, not the OS integration or live provider. Check current Groq model availability and costs before testing.
+Use a test Groq account and non-sensitive sample text. Automated tests cover WAV, Ogg encoding, chunk logic and mocked provider requests, not OS integration or the live provider. Check current Groq model availability and costs before testing.
 
 1. Build, run tests, and publish using the README commands. Launch the published app on a clean Windows 10/11 account with microphone permission enabled.
 2. First launch opens settings. Save a valid key, close and reopen the app, and verify dictation works; confirm `groq.key` is ciphertext and contains no plaintext key. Replace and remove the key; restarting after removal should show settings. Check that another Windows account cannot decrypt the first account's key.
@@ -37,3 +37,7 @@ In Personalization, check the seven-day figure after multiple successfully inser
 ## Formatter fallback
 
 Automated mock tests simulate 429/503 and an interrupted stream on the primary, successful 120B fallback, errors from both models, bad credentials, cancellation and partial direct insertion. Manually with an authorized test account, verify 20B remains the normal path. If safe and feasible, use a controlled network/provider stub to simulate eligible failures: preview should clear before switching to 120B; a direct stream that has already typed any text must not retry or insert raw text. Check model indication, latency including both attempts, failure messaging, and account-specific quota/cost behavior. Never share API keys or transcript data in test logs.
+
+## Long dictations and compression
+
+Use non-sensitive speech and a test key. Test below and above the configured threshold, at 8 seconds and at 14 seconds, with chunking on and off and each compression setting. Inspect the comparison window for chunked/full/retry labels, and check that recording-time uploads happen only when chunking is enabled and the threshold has been reached. Test sustained speech with no pauses, pauses at boundaries, repeated phrases, numbers, names, mixed languages, silence and very short tails. Compare transcripts against manually corrected references and the full WAV baseline. Simulate an empty, failed or ambiguous chunk and ensure a full uncompressed retry occurs; cancellation must not retry. Test closing the app and losing the network mid-recording. Confirm audio remains in memory and no files are created. Live recognition quality, quota use, latency, microphone operation and focus/insertion require Windows and a real account.
