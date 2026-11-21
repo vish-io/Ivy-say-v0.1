@@ -119,4 +119,20 @@ public class GroqClientTests
         using var client = new GroqClient(new StubHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"content\":\"incomplete\"}}]}") })));
         await Assert.ThrowsAsync<InvalidOperationException>(() => client.PolishAsync("some speech", "test-key", CancellationToken.None));
     }
+    [Fact]
+    public async Task FullWavUploadPreservesCapturedPcmExactly()
+    {
+        byte[] pcm = { 1, 2, 3, 4, 250, 255 };
+        byte[] wav = WavEncoder.Encode16KhzMono(pcm);
+        using var client = new GroqClient(new StubHandler(async (request, token) =>
+        {
+            var multipart = Assert.IsType<MultipartFormDataContent>(request.Content);
+            var file = multipart.Single(part => part.Headers.ContentDisposition?.Name?.Trim('"') == "file");
+            Assert.Equal("audio/wav", file.Headers.ContentType!.MediaType);
+            Assert.Equal(wav, await file.ReadAsByteArrayAsync(token));
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"text\":\"test\"}") };
+        }));
+        Assert.Equal("test", await client.TranscribeAsync(wav, "test-key", "whisper-large-v3", "en", "", CancellationToken.None));
+    }
+
 }

@@ -27,7 +27,9 @@ internal sealed class ChunkedTranscription
         while (true)
         {
             int cut = FindPause(pcm, end + 7 * BytesPerSecond);
-            if (cut <= end || cut >= pcm.Length) break;
+            // Do not manufacture a tiny final file from the last pause. Short, quiet
+            // fragments are particularly prone to spurious Whisper output.
+            if (cut <= end || pcm.Length - cut < 2 * BytesPerSecond) break;
             int start = end == 0 ? 0 : Math.Max(0, end - Overlap);
             Queue(pcm[start..cut]);
             end = cut;
@@ -38,18 +40,12 @@ internal sealed class ChunkedTranscription
         Task<string>? previous = parts.Count == 0 ? null : parts[^1];
         parts.Add(Task.Run(async () =>
         {
+            if (previous != null) await previous.ConfigureAwait(false);
+            // Previous output can bias a quiet tail into repeating invented words.
+            // Use only the user's explicit vocabulary/spelling hints.
             string prompt = hints;
-            if (previous != null)
-            {
-                string last = await previous.ConfigureAwait(false);
-                // Preserve priority for the user's hints; only append context that fits.
-                var words = last.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-                string context = string.Join(" ", words.TakeLast(20));
-                int available = 160 - prompt.Length - (prompt.Length > 0 ? 2 : 0);
-                if (available > 0 && context.Length <= available && context.Length > 0)
-                    prompt += (prompt.Length > 0 ? ", " : "") + context;
-            }
             token.ThrowIfCancellationRequested();
+            AudioSignal.RequireSignal(pcm);
             byte[] payload;
             bool compressed = kbps != 0;
             try { payload = AudioPayload.Encode(pcm, kbps); }
@@ -87,6 +83,8 @@ internal sealed class ChunkedTranscription
     }
     private async Task<string> FullAsync(byte[] pcm, int bitrate)
     {
+        token.ThrowIfCancellationRequested();
+        AudioSignal.RequireSignal(pcm);
         byte[] payload;
         bool compressed = bitrate != 0;
         try { payload = await Task.Run(() => AudioPayload.Encode(pcm, bitrate), token).ConfigureAwait(false); }

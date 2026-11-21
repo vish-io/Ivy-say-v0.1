@@ -13,6 +13,7 @@
     <Compile Include="../IvySay/InsertionGuard.cs" Link="InsertionGuard.cs" />
     <Compile Include="../IvySay/PersonalizationRules.cs" Link="PersonalizationRules.cs" />
     <Compile Include="../IvySay/ChunkedTranscription.cs" Link="ChunkedTranscription.cs" />
+    <Compile Include="../IvySay/AudioSignal.cs" Link="AudioSignal.cs" />
     <Compile Include="../IvySay/AudioPayload.cs" Link="AudioPayload.cs" />
     <Compile Include="../IvySay/WavEncoder.cs" Link="WavEncoder.cs" />
     <Compile Include="../IvySay/GroqClient.cs" Link="GroqClient.cs" />

@@ -59,6 +59,7 @@ public partial class MainWindow : Window
         if (recorder == null)
         {
             if (!KeyStore.Exists) { ShowSettings(); return; }
+            busy = true;
             try
             {
                 target = Native.GetForegroundWindow();
@@ -74,7 +75,8 @@ public partial class MainWindow : Window
                 chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
                     (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, recordingKey, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
                 recorder = new AudioRecorder(settingsSnapshot.Microphone);
-                recorder.Start();
+                SetStatus("Preparing microphone…", "Wait for Listening before speaking");
+                await recorder.StartAsync(lifetime.Token);
                 recordingTimer.Start();
                 chunkTimer.Start();
                 if (settingsSnapshot.WarmConnection)
@@ -88,7 +90,9 @@ public partial class MainWindow : Window
                 }
                 SetStatus("Listening…", "Press shortcut again to finish");
             }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recorder?.Dispose(); recorder = null; ShowError(ex); }
+            finally { busy = false; }
             return;
         }
         recordingTimer.Stop();
@@ -207,7 +211,7 @@ public partial class MainWindow : Window
                 recoverableText = null;
                 SetCompletionStatus(firstWordTimer, usedFallback);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)").Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -232,7 +236,7 @@ public partial class MainWindow : Window
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)").Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

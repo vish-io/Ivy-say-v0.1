@@ -17,7 +17,7 @@ public partial class SettingsWindow : Window
         EnableChunking.IsChecked = preferences.EnableChunking;
         ChunkThreshold.Text = preferences.ChunkThresholdSeconds.ToString();
         Model.SelectedIndex = preferences.TranscriptionModel == "whisper-large-v3-turbo" ? 1 : 0;
-        Microphone.Items.Add(new MicrophoneOption("Windows default", null));
+        Microphone.Items.Add(new MicrophoneOption("Windows default (may change after restart)", null));
         for (int i = 0; i < WaveIn.DeviceCount; i++)
         {
             string name = WaveIn.GetCapabilities(i).ProductName;
