@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Diagnostics;
@@ -17,6 +18,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? recordingCancellation;
     private Preferences? recordingPreferences;
     private PersonalizationData? recordingPersonal;
+    private string? recordingKey;
+    private IInputElement? settingsTargetElement;
     private readonly DispatcherTimer chunkTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private IntPtr target;
     private IntPtr targetControl;
@@ -55,7 +58,7 @@ public partial class MainWindow : Window
     }
     private async Task ToggleAsync()
     {
-        if (busy || settings?.IsVisible == true) return;
+        if (busy) return;
         if (recorder == null)
         {
             if (!KeyStore.Exists) { ShowSettings(); return; }
@@ -65,15 +68,25 @@ public partial class MainWindow : Window
                 target = Native.GetForegroundWindow();
                 if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
                 targetControl = Native.FocusedControl(target);
+                settingsTargetElement = null;
+                if (settings?.IsVisible == true && new WindowInteropHelper(settings).Handle == target)
+                {
+                    // Win32 exposes only WPF's top-level HWND, not which WPF control has focus.
+                    // Do not dictate into buttons or secret-key fields, and remember the exact editor.
+                    if (Keyboard.FocusedElement is not TextBoxBase editor || !editor.IsEnabled || editor.IsReadOnly)
+                        throw new InvalidOperationException("Click an editable text box before starting dictation. The API key field cannot be used for dictation.");
+                    settingsTargetElement = editor;
+                }
                 var settingsSnapshot = Preferences.Load();
-                string recordingKey = KeyStore.Load();
+                string keySnapshot = KeyStore.Load();
+                recordingKey = keySnapshot;
                 var personal = settingsSnapshot.UsePersonalization ? PersonalizationStore.Load() : new PersonalizationData();
                 string hints = settingsSnapshot.UsePersonalization ? PersonalizationRules.BuildPrompt(personal.Vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
                 recordingPreferences = settingsSnapshot;
                 recordingPersonal = personal;
                 recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
                 chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
-                    (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, recordingKey, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
+                    (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, keySnapshot, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
                 recorder = new AudioRecorder(settingsSnapshot.Microphone);
                 SetStatus("Preparing microphone…", "Wait for Listening before speaking");
                 await recorder.StartAsync(lifetime.Token);
@@ -84,14 +97,14 @@ public partial class MainWindow : Window
                     CancellationToken token = lifetime.Token;
                     _ = Task.Run(async () =>
                     {
-                        try { await groq.WarmConnectionAsync(KeyStore.Load(), token); }
+                        try { await groq.WarmConnectionAsync(keySnapshot, token); }
                         catch { /* Warmup is best-effort and must never prevent recording. */ }
                     });
                 }
                 SetStatus("Listening…", "Press shortcut again to finish");
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recorder?.Dispose(); recorder = null; ShowError(ex); }
+            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowError(ex); }
             finally { busy = false; }
             return;
         }
@@ -111,7 +124,7 @@ public partial class MainWindow : Window
             TimeSpan recordingDuration = TimeSpan.FromSeconds((wav.Length - 44) / 32000d);
             var preferences = recordingPreferences!;
             var personal = recordingPersonal!;
-            string key = KeyStore.Load();
+            string key = recordingKey!;
             allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
             var transcriptionTimer = Stopwatch.StartNew();
             if (preferences.EnableChunking) chunkSession!.Update(wav[44..]);
@@ -159,7 +172,7 @@ public partial class MainWindow : Window
                         {
                             if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
                             directAttempted = true; // Even a failed call can insert part of a fragment.
-                            Native.TypeText(fragment, target, targetControl, currentWordTimer.Observe);
+                            Native.TypeText(fragment, target, targetControl, currentWordTimer.Observe, ValidateSettingsTarget);
                         }
                         return Task.CompletedTask;
                     },
@@ -176,7 +189,7 @@ public partial class MainWindow : Window
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
                     {
                         if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
-                        Native.TypeText(" ", target, targetControl, currentWordTimer.Observe);
+                        Native.TypeText(" ", target, targetControl, currentWordTimer.Observe, ValidateSettingsTarget);
                     }
                     if (direct) currentWordTimer.Complete();
                     directComplete = direct;
@@ -229,7 +242,7 @@ public partial class MainWindow : Window
             for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
-            Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null);
+            Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
@@ -249,7 +262,13 @@ public partial class MainWindow : Window
             }
             else ShowError(ex);
         }
-        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; current.Dispose(); busy = false; }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; current.Dispose(); busy = false; }
+    }
+
+    private void ValidateSettingsTarget()
+    {
+        if (settingsTargetElement != null)
+            SettingsTargetGuard.Validate(settingsTargetElement, Keyboard.FocusedElement, settings?.IsVisible == true, settings?.IsActive == true);
     }
 
     private static string ModelLabel(string model) => model == FormatterRouter.Fallback ? "GPT-OSS 120B" : "GPT-OSS 20B";

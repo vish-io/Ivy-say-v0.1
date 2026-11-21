@@ -44,13 +44,15 @@ internal static class Native
     [StructLayout(LayoutKind.Explicit)] private struct InputUnion { [FieldOffset(0)] public KEYBDINPUT keyboard; [FieldOffset(0)] public MOUSEINPUT mouse; }
     [StructLayout(LayoutKind.Sequential)] private struct KEYBDINPUT { public ushort vk, scan; public uint flags, time; public UIntPtr extra; }
     [StructLayout(LayoutKind.Sequential)] private struct MOUSEINPUT { public int dx, dy; public uint mouseData, flags, time; public UIntPtr extra; }
-    public static void TypeText(string text, IntPtr target, IntPtr focus, Action<char>? onAccepted = null)
+    public static void TypeText(string text, IntPtr target, IntPtr focus, Action<char>? onAccepted = null, Action? validateTarget = null)
     {
+        validateTarget?.Invoke();
         if (target == IntPtr.Zero || GetForegroundWindow() != target) throw new InvalidOperationException("The target window changed. Text was not inserted; try again in the intended app.");
         if (focus != IntPtr.Zero && FocusedControl(target) != focus) throw new InvalidOperationException("The focused control changed.");
         // Unicode input avoids clobbering the user's clipboard. Recheck focus for each character.
         foreach (char c in text)
         {
+            validateTarget?.Invoke();
             if (GetForegroundWindow() != target || (focus != IntPtr.Zero && FocusedControl(target) != focus)) throw new InvalidOperationException("Focus changed during insertion. Some text may have been inserted.");
             var inputs = new INPUT[2];
             inputs[0].type = inputs[1].type = 1;
