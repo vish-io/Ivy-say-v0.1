@@ -162,7 +162,7 @@ public class GroqClientTests
             Assert.DoesNotContain("produce code in the requested language", instructions);
             if (systemPrompt == null) systemPrompt = instructions; else Assert.Equal(systemPrompt, instructions);
             using var value = JsonDocument.Parse(messages[1].GetProperty("content").GetString()!);
-            Assert.Equal(1, value.RootElement.EnumerateObject().Count());
+            Assert.Single(value.RootElement.EnumerateObject());
             Assert.Equal(input, value.RootElement.GetProperty("transcript").GetString());
             Assert.Equal("low", root.GetProperty("reasoning_effort").GetString());
             calls++;
