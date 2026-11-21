@@ -4,7 +4,7 @@ Ivy Say is an unsigned MVP, not a security-certified product. Do not use it as a
 
 ## Prompt injection and generated text
 
-The transcript is sent as a user message separate from the formatter's system instructions. The formatter has no tools or ability to run code, and the prompt asks it not to follow instructions in dictated content. These are mitigations, **not** guarantees: a model can still obey, hallucinate, or alter text. Treat both transcript and model output as untrusted, and review before sending, executing, or relying on them.
+The transcript is JSON-encoded as data in a user message separate from the formatter's system instructions. The prompt restricts it to editing and explicitly forbids answering questions or generating code from requests, including in Code mode. The formatter has no tools or ability to run code. JSON encoding protects the API message structure, not the model from instructions inside the data. These are mitigations, **not** guarantees: a model can still obey, hallucinate, or alter text. Treat both transcript and model output as untrusted, and review before sending, executing, or relying on them.
 
 Ivy Say checks the foreground window and detectable Win32 focused control at insertion. Settings offer three security levels:
 
