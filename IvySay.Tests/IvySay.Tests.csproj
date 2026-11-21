@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Concentus.Oggfile" Version="1.0.7" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -11,6 +12,8 @@
     <Compile Include="../IvySay/Preferences.cs" Link="Preferences.cs" />
     <Compile Include="../IvySay/InsertionGuard.cs" Link="InsertionGuard.cs" />
     <Compile Include="../IvySay/PersonalizationRules.cs" Link="PersonalizationRules.cs" />
+    <Compile Include="../IvySay/ChunkedTranscription.cs" Link="ChunkedTranscription.cs" />
+    <Compile Include="../IvySay/AudioPayload.cs" Link="AudioPayload.cs" />
     <Compile Include="../IvySay/WavEncoder.cs" Link="WavEncoder.cs" />
     <Compile Include="../IvySay/GroqClient.cs" Link="GroqClient.cs" />
   </ItemGroup>

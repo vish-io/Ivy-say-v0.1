@@ -23,6 +23,13 @@
           <StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Global shortcut" FontWeight="SemiBold" Margin="0,0,0,6"/><ComboBox x:Name="Shortcut" Padding="8" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox></StackPanel>
         </Grid>
         <TextBlock Text="Restart Ivy Say after changing the shortcut." Foreground="#687a70" FontSize="12" Margin="0,8,0,0"/>
+        <TextBlock Text="AUDIO PERFORMANCE" Foreground="#638171" FontSize="10" FontWeight="Bold" Margin="0,20,0,0"/>
+        <TextBlock Text="Audio compression (recordings of 8 seconds or more)" FontWeight="SemiBold" Margin="0,12,0,6"/>
+        <ComboBox x:Name="Compression" Padding="8" SelectedIndex="0"><ComboBoxItem Content="None · WAV (default)"/><ComboBoxItem Content="Opus · 24 kbps"/><ComboBoxItem Content="Opus · 32 kbps"/><ComboBoxItem Content="Opus · 48 kbps"/></ComboBox>
+        <CheckBox x:Name="EnableChunking" Content="Transcribe longer recordings in background chunks" Margin="0,14,0,0"/>
+        <TextBlock Text="Start chunking after (seconds, 14–120)" FontWeight="SemiBold" Margin="0,12,0,6"/>
+        <TextBox x:Name="ChunkThreshold" Padding="8" MaxLength="3"/>
+        <TextBlock Text="Chunks are sent to Groq while you speak, using extra requests and quota. Quiet pauses are approximate; accuracy may change. The full original stays in memory for a WAV retry if a chunk fails or a boundary is ambiguous. No guarantee of perfect recognition." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
         <TextBlock Text="Spelling hints (optional)" FontWeight="SemiBold" Margin="0,16,0,6"/><TextBox x:Name="SpellingHints" MaxLength="160" Padding="8" ToolTip="Names and words to help Whisper recognize them"/>
         <TextBlock Text="Comma-separated terms. Stored unencrypted and sent to Groq with every recording; do not enter secrets." TextWrapping="Wrap" Foreground="#687a70" FontSize="12" Margin="0,7,0,0"/>
         <Separator Margin="0,20,0,20" Background="#e2eae2"/>

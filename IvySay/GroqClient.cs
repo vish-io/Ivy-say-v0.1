@@ -42,12 +42,14 @@ internal sealed class GroqClient : IDisposable
         catch (ObjectDisposedException) { }
         catch (InvalidOperationException) { }
     }
-    public async Task<string> TranscribeAsync(byte[] wav, string key, string model, string language, string spellingHints, CancellationToken cancellationToken)
+    public Task<string> TranscribeAsync(byte[] wav, string key, string model, string language, string spellingHints, CancellationToken cancellationToken)
+        => TranscribeAudioAsync(wav, false, key, model, language, spellingHints, cancellationToken);
+    public async Task<string> TranscribeAudioAsync(byte[] wav, bool opus, string key, string model, string language, string spellingHints, CancellationToken cancellationToken)
     {
         using var audio = new MultipartFormDataContent();
         var file = new ByteArrayContent(wav);
-        file.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
-        audio.Add(file, "file", "audio.wav");
+        file.Headers.ContentType = new MediaTypeHeaderValue(opus ? "audio/ogg" : "audio/wav");
+        audio.Add(file, "file", opus ? "audio.ogg" : "audio.wav");
         audio.Add(new StringContent(model), "model");
         audio.Add(new StringContent("json"), "response_format");
         if (language is "en" or "hi" or "pa") audio.Add(new StringContent(language), "language");

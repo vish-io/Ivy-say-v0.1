@@ -18,6 +18,9 @@ internal sealed class Preferences
     public bool WarmConnection { get; set; }
     public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
+    public int CompressionKbps { get; set; }
+    public int ChunkThresholdSeconds { get; set; } = 14;
+    public bool EnableChunking { get; set; } = true;
     public bool Polish { get; set; } = true;
     private static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay", "preferences.json");
     public static Preferences Load()
@@ -28,6 +31,8 @@ internal sealed class Preferences
             if (value.TranscriptionModel is not ("whisper-large-v3" or "whisper-large-v3-turbo")) value.TranscriptionModel = "whisper-large-v3";
             if (value.Language is not ("auto" or "en" or "hi" or "pa")) value.Language = "auto";
             if (value.SpellingHints is null || value.SpellingHints.Length > 160) value.SpellingHints = "";
+            if (value.CompressionKbps is not (0 or 24 or 32 or 48)) value.CompressionKbps = 0;
+            if (value.ChunkThresholdSeconds < 14 || value.ChunkThresholdSeconds > 120) value.ChunkThresholdSeconds = 14;
             value.SecurityLevel = NormalizeSecurityLevel(value.SecurityLevel, value.AlwaysReview);
             value.AlwaysReview = false;
             if (value.Shortcut is not ("CtrlWinSpace" or "CtrlShiftSpace" or "AltShiftSpace")) value.Shortcut = "CtrlWinSpace";

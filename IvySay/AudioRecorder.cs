@@ -25,6 +25,7 @@ internal sealed class AudioRecorder : IDisposable
         input.RecordingStopped += (_, e) => stopped.TrySetResult(e.Exception);
     }
     public void Start() => input.StartRecording();
+    public byte[] SnapshotPcm() { lock (sync) return pcm.ToArray(); }
     public async Task<byte[]> StopAsync()
     {
         input.StopRecording();

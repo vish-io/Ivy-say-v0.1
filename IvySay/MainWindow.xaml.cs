@@ -13,6 +13,11 @@ public partial class MainWindow : Window
     private readonly GroqClient groq = new();
     private readonly CancellationTokenSource lifetime = new();
     private AudioRecorder? recorder;
+    private ChunkedTranscription? chunkSession;
+    private CancellationTokenSource? recordingCancellation;
+    private Preferences? recordingPreferences;
+    private PersonalizationData? recordingPersonal;
+    private readonly DispatcherTimer chunkTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private IntPtr target;
     private IntPtr targetControl;
     private string shortcutLabel = "Ctrl + Win + Space";
@@ -26,10 +31,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         Left = SystemParameters.WorkArea.Right - Width - 32;
         Top = SystemParameters.WorkArea.Bottom - Height - 32;
+        chunkTimer.Tick += (_, _) => { if (recorder != null && recordingPreferences?.EnableChunking == true) chunkSession?.Update(recorder.SnapshotPcm()); };
         recordingTimer.Tick += async (_, _) => { recordingTimer.Stop(); if (recorder != null) await ToggleAsync(); };
         SourceInitialized += OnSourceInitialized;
         Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); };
-        Closed += (_, _) => { recordingTimer.Stop(); lifetime.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        Closed += (_, _) => { recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -59,9 +65,18 @@ public partial class MainWindow : Window
                 if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
                 targetControl = Native.FocusedControl(target);
                 var settingsSnapshot = Preferences.Load();
+                string recordingKey = KeyStore.Load();
+                var personal = settingsSnapshot.UsePersonalization ? PersonalizationStore.Load() : new PersonalizationData();
+                string hints = settingsSnapshot.UsePersonalization ? PersonalizationRules.BuildPrompt(personal.Vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
+                recordingPreferences = settingsSnapshot;
+                recordingPersonal = personal;
+                recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+                chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
+                    (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, recordingKey, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
                 recorder = new AudioRecorder(settingsSnapshot.Microphone);
                 recorder.Start();
                 recordingTimer.Start();
+                chunkTimer.Start();
                 if (settingsSnapshot.WarmConnection)
                 {
                     CancellationToken token = lifetime.Token;
@@ -73,10 +88,11 @@ public partial class MainWindow : Window
                 }
                 SetStatus("Listening…", "Press shortcut again to finish");
             }
-            catch (Exception ex) { recorder?.Dispose(); recorder = null; ShowError(ex); }
+            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recorder?.Dispose(); recorder = null; ShowError(ex); }
             return;
         }
         recordingTimer.Stop();
+        chunkTimer.Stop();
         busy = true;
         var current = recorder;
         recorder = null;
@@ -89,20 +105,14 @@ public partial class MainWindow : Window
             byte[] wav = await current.StopAsync();
             // Audio is 16 kHz, mono, 16-bit PCM with a 44-byte WAV header.
             TimeSpan recordingDuration = TimeSpan.FromSeconds((wav.Length - 44) / 32000d);
-            var preferences = Preferences.Load();
-            allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
+            var preferences = recordingPreferences!;
+            var personal = recordingPersonal!;
             string key = KeyStore.Load();
-            PersonalizationData personal = new();
-            if (preferences.UsePersonalization)
-            {
-                try { personal = PersonalizationStore.Load(); }
-                catch { throw new InvalidOperationException("Could not load your encrypted personalization data. Open settings to review or delete it."); }
-            }
-            string hints = preferences.UsePersonalization
-                ? PersonalizationRules.BuildPrompt(personal.Vocabulary, preferences.SpellingHints)
-                : preferences.SpellingHints;
+            allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
             var transcriptionTimer = Stopwatch.StartNew();
-            string raw = await groq.TranscribeAsync(wav, key, preferences.TranscriptionModel, preferences.Language, hints, lifetime.Token);
+            if (preferences.EnableChunking) chunkSession!.Update(wav[44..]);
+            string raw = await chunkSession!.FinishAsync(wav);
+            if (chunkSession.UsedFullRecordingFallback) SetStatus("Transcribed", "Full recording retry used");
             transcriptionTimer.Stop();
             TimeSpan? formattingTime = null;
             TimeSpan? firstDeltaTime = null;
@@ -197,7 +207,7 @@ public partial class MainWindow : Window
                 recoverableText = null;
                 SetCompletionStatus(firstWordTimer, usedFallback);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -222,7 +232,7 @@ public partial class MainWindow : Window
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel, transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)
@@ -234,7 +244,7 @@ public partial class MainWindow : Window
             }
             else ShowError(ex);
         }
-        finally { current.Dispose(); busy = false; }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; current.Dispose(); busy = false; }
     }
 
     private void SetCompletionStatus(FirstWordTimer? timer, bool usedFallback)
