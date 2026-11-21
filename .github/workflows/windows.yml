@@ -19,13 +19,20 @@ jobs:
       - name: Smoke test Settings window on Windows
         shell: pwsh
         run: |
-          dotnet build IvySay.UiSmoke/IvySay.UiSmoke.csproj -c Release
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build IvySay.UiSmoke/IvySay.UiSmoke.csproj -c Release *> build-smoke.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content build-smoke.log | ForEach-Object { Write-Output "::error::$_" }
+            exit 1
+          }
           $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP "ivy-ui-smoke"
           New-Item -ItemType Directory -Force $env:LOCALAPPDATA | Out-Null
-          $proc = Start-Process dotnet -ArgumentList 'IvySay.UiSmoke/bin/Release/net8.0-windows/IvySay.UiSmoke.dll' -NoNewWindow -PassThru
+          $proc = Start-Process dotnet -ArgumentList 'IvySay.UiSmoke/bin/Release/net8.0-windows/IvySay.UiSmoke.dll' -NoNewWindow -PassThru -RedirectStandardOutput smoke-out.log -RedirectStandardError smoke-err.log
           if (-not $proc.WaitForExit(30000)) { Stop-Process -Id $proc.Id -Force; throw "Settings UI smoke test timed out" }
-          if ($proc.ExitCode -ne 0) { throw "Settings UI smoke test failed: $($proc.ExitCode)" }
+          Get-Content smoke-out.log
+          if ($proc.ExitCode -ne 0) {
+            Get-Content smoke-err.log | ForEach-Object { Write-Output "::error::$_" }
+            throw "Settings UI smoke test failed: $($proc.ExitCode)"
+          }
       - run: dotnet publish IvySay/IvySay.csproj -c Release -r win-x64 --self-contained true -o publish
       - name: Verify executable is included
         shell: pwsh
