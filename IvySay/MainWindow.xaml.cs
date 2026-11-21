@@ -73,7 +73,7 @@ public partial class MainWindow : Window
                 {
                     // Win32 exposes only WPF's top-level HWND, not which WPF control has focus.
                     // Do not dictate into buttons or secret-key fields, and remember the exact editor.
-                    if (Keyboard.FocusedElement is not TextBoxBase editor || !editor.IsEnabled || editor.IsReadOnly)
+                    if (Keyboard.FocusedElement is not TextBoxBase editor || !editor.IsEnabled || editor.IsReadOnly || settings.IsSecretEditor(editor))
                         throw new InvalidOperationException("Click an editable text box before starting dictation. The API key field cannot be used for dictation.");
                     settingsTargetElement = editor;
                 }

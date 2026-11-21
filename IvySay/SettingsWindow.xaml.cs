@@ -1,11 +1,61 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using NAudio.Wave;
 
 namespace IvySay;
 public partial class SettingsWindow : Window
 {
     private bool personalizationReadable = true;
+    private bool initialized;
+    private int saveVersion;
+    internal bool IsSecretEditor(TextBoxBase editor) => ReferenceEquals(editor, VisibleApiKey);
+    private void MarkDirty(object sender, RoutedEventArgs e)
+    {
+        if (!initialized || e.OriginalSource is not (ComboBox or CheckBox or TextBox) ||
+            e.OriginalSource == VisibleApiKey || e.OriginalSource == Vocabulary || e.OriginalSource == Corrections || e.OriginalSource == UsePersonalization) return;
+        saveVersion++;
+        GeneralSettingsSave.Content = "Save settings";
+        var glow = new System.Windows.Media.Effects.DropShadowEffect { Color = (Color)ColorConverter.ConvertFromString("#5B7BFF"), BlurRadius = 14, ShadowDepth = 0 };
+        GeneralSettingsSave.Effect = glow;
+        glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, new DoubleAnimation(0.25, 0.7, TimeSpan.FromSeconds(1.2)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
+    }
+    private async void SavedFeedback()
+    {
+        int version = ++saveVersion;
+        GeneralSettingsSave.Effect = null;
+        GeneralSettingsSave.Content = "Saved";
+        await Task.Delay(1200);
+        if (saveVersion == version) GeneralSettingsSave.Content = "Save settings";
+    }
+    private void ToggleKeyVisibility(object sender, RoutedEventArgs e)
+    {
+        if (VisibleApiKey.Visibility == Visibility.Visible)
+        {
+            ApiKey.Password = VisibleApiKey.Text;
+            VisibleApiKey.Clear();
+            VisibleApiKey.Visibility = Visibility.Collapsed;
+            ApiKey.Visibility = Visibility.Visible;
+            KeyVisibility.Content = "Show";
+            ApiKey.Focus();
+        }
+        else
+        {
+            VisibleApiKey.Text = ApiKey.Password;
+            ApiKey.Clear();
+            ApiKey.Visibility = Visibility.Collapsed;
+            VisibleApiKey.Visibility = Visibility.Visible;
+            KeyVisibility.Content = "Hide";
+            VisibleApiKey.Focus();
+        }
+    }
+    private void ClearKeyEditors()
+    {
+        ApiKey.Clear(); VisibleApiKey.Clear(); VisibleApiKey.Visibility = Visibility.Collapsed;
+        ApiKey.Visibility = Visibility.Visible; KeyVisibility.Content = "Show";
+    }
     private sealed record MicrophoneOption(string Label, string? DeviceName);
     public SettingsWindow()
     {
@@ -46,6 +96,20 @@ public partial class SettingsWindow : Window
         try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; Corrections.Text = data.Corrections; }
         catch { personalizationReadable = false; MessageBox.Show("Could not decrypt personalization data for this Windows account. Existing data was not changed. Delete it explicitly before creating a new profile.", "Ivy Say"); }
         Shortcut.SelectedIndex = preferences.Shortcut switch { "CtrlShiftSpace" => 1, "AltShiftSpace" => 2, _ => 0 };
+        AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(MarkDirty));
+        AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(MarkDirty));
+        AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler(MarkDirty));
+        AddHandler(ToggleButton.UncheckedEvent, new RoutedEventHandler(MarkDirty));
+        KeySection.Collapsed += (_, _) =>
+        {
+            if (VisibleApiKey.Visibility == Visibility.Visible)
+            {
+                ApiKey.Password = VisibleApiKey.Text; VisibleApiKey.Clear();
+                VisibleApiKey.Visibility = Visibility.Collapsed; ApiKey.Visibility = Visibility.Visible; KeyVisibility.Content = "Show";
+            }
+        };
+        Closed += (_, _) => ClearKeyEditors();
+        initialized = true;
     }
     private void SavePreferences(object sender, RoutedEventArgs e)
     {
@@ -60,9 +124,9 @@ public partial class SettingsWindow : Window
             if (StreamingMode.SelectedIndex == 1 && security == "Unrestricted" && (!existing.StreamDirect || existing.SecurityLevel != "Unrestricted") &&
                 MessageBox.Show("Direct streaming types partial AI output immediately. It cannot be undone automatically; a failure or focus change may leave partial text, and terminal commands may run. Enable it?", "Ivy Say · Streaming", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             new Preferences { SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
-            MessageBox.Show(existing.Shortcut != (Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" })
-                ? "Settings saved. Restart Ivy Say to use your new shortcut."
-                : "Settings saved.", "Ivy Say");
+            SavedFeedback();
+            if (existing.Shortcut != (Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" }))
+                MessageBox.Show("Settings saved. Restart Ivy Say to use your new shortcut.", "Ivy Say");
         }
         catch { MessageBox.Show("Could not save preferences.", "Ivy Say"); }
     }
@@ -75,13 +139,20 @@ public partial class SettingsWindow : Window
             2 => "Review and copy each result yourself. Unsafe characters are blocked from copying.",
             _ => "Some text and destinations are held for review. These checks can miss risks."
         };
-        SecurityDescription.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(SecurityLevel.SelectedIndex == 0 ? "#a04b35" : "#687a70"));
+        SecurityDescription.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(SecurityLevel.SelectedIndex == 0 ? "#F59E7A" : "#9CA3B5"));
     }
     private void SettingsTabChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SettingsTabs == null || GeneralSettingsSave == null || e.Source != SettingsTabs) return;
         // Personal words have their own explicit save/delete actions.
         GeneralSettingsSave.Visibility = SettingsTabs.SelectedIndex == 1 ? Visibility.Collapsed : Visibility.Visible;
+        if (initialized && SettingsTabs.SelectedContent is FrameworkElement view)
+        {
+            view.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150)));
+            var shift = new TranslateTransform();
+            view.RenderTransform = shift;
+            shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(6, 0, TimeSpan.FromMilliseconds(150)));
+        }
     }
     private void CloseSettings(object sender, RoutedEventArgs e) => Close();
     private void RefreshStats()
@@ -128,14 +199,14 @@ public partial class SettingsWindow : Window
     private void RefreshStatus() => KeyStatus.Text = KeyStore.Exists ? "A key is saved securely. Enter a new key to replace it." : "Enter your Groq API key to get started. It stays encrypted on this device.";
     private void SaveKey(object sender, RoutedEventArgs e)
     {
-        string key = ApiKey.Password.Trim();
+        string key = (VisibleApiKey.Visibility == Visibility.Visible ? VisibleApiKey.Text : ApiKey.Password).Trim();
         if (key.Length < 10 || key.Length > 512 || key.Any(char.IsWhiteSpace) || key.Any(char.IsControl)) { MessageBox.Show("Enter a valid Groq API key without spaces.", "Ivy Say"); return; }
-        try { KeyStore.Save(key); ApiKey.Clear(); RefreshStatus(); KeySection.IsExpanded = false; MessageBox.Show("Key saved securely.", "Ivy Say"); }
+        try { KeyStore.Save(key); ClearKeyEditors(); RefreshStatus(); KeySection.IsExpanded = false; MessageBox.Show("Key saved securely.", "Ivy Say"); }
         catch { MessageBox.Show("Could not securely save the key for this Windows account.", "Ivy Say"); }
     }
     private void RemoveKey(object sender, RoutedEventArgs e)
     {
-        try { KeyStore.Delete(); ApiKey.Clear(); RefreshStatus(); KeySection.IsExpanded = true; }
+        try { KeyStore.Delete(); ClearKeyEditors(); RefreshStatus(); KeySection.IsExpanded = true; }
         catch { MessageBox.Show("Could not remove the saved key.", "Ivy Say"); }
     }
     private void Quit(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
