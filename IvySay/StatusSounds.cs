@@ -10,12 +10,18 @@ internal static class StatusSounds
         {
             try
             {
-                const int rate = 22050, length = 1764; // 80ms with soft envelope
+                // Gentle, low-volume two-tone bell with a soft attack and long decay.
+                const int rate = 22050, length = 5954;
+                double fundamental = frequency == 250 ? 329.63 : frequency == 900 ? 440.0 : 392.0;
                 byte[] pcm = new byte[length * 2];
                 for (int i = 0; i < length; i++)
                 {
-                    double envelope = Math.Sin(Math.PI * i / length);
-                    short sample = (short)(2500 * envelope * Math.Sin(2 * Math.PI * frequency * i / rate));
+                    double t = i / (double)rate;
+                    double fadeIn = Math.Min(1, t / 0.035);
+                    double fadeOut = Math.Min(1, (length - 1 - i) / (rate * 0.09));
+                    double envelope = Math.Max(0, fadeIn * fadeOut) * Math.Exp(-t * 5);
+                    double tone = Math.Sin(2 * Math.PI * fundamental * t) + 0.20 * Math.Sin(2 * Math.PI * fundamental * 1.5 * t);
+                    short sample = (short)(1150 * envelope * tone);
                     pcm[i * 2] = (byte)sample; pcm[i * 2 + 1] = (byte)(sample >> 8);
                 }
                 using var output = new WaveOutEvent { DesiredLatency = 80 };

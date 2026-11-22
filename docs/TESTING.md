@@ -93,3 +93,7 @@ Verify enabled and disabled vocabulary requests and 160-character whole-term cap
 ## Styles, Quick Notes and audio cues
 
 Test pill and mode hotkey through all styles, including app context and explicit format commands, snippets, disabled AI and direct streaming. Compare real transcripts for meaning preservation on both models. In Windows test explicit Quick Note shortcut with desktop/noneditable foreground, disabled and enabled settings, chosen folder, no key, microphone errors, formatting failure, folder permissions/full disk, focus changes, shortcuts held, partial writes, and no automatic file creation in ordinary dictation. Test notification and sound disabled/enabled, speakers and headphones, failures, recording startup, completion and shortcut conflicts; no success cue before completion.
+
+## Buffered insertion and cues
+
+Test Wait until the text is ready against Notepad, WPF editors, browsers and Unicode/emoji text, including large text, multiline, guarded review, focus switching, elevated targets and partial/blocked input. SendInput acceptance is not proof of target rendering. Confirm direct streaming remains incremental and that partial failures are never automatically retried. Test sounds at different volume levels and speakers/headphones; sounds remain optional and may be recorded by the microphone. Check the style option on the pill context menu and Ctrl+Alt+Win+M.

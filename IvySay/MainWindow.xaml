@@ -1,10 +1,9 @@
 <Window Icon="/IvySay;component/IvySay.ico" x:Class="IvySay.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:IvySay" Cursor="{x:Static local:AppCursors.Arrow}" Title="Ivy Say" Width="256" Height="74" WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True" ShowInTaskbar="True" ShowActivated="False" ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True">
-    <Border CornerRadius="37" BorderThickness="1" BorderBrush="#4F2C2F36" Background="#B21D1D1D" MouseLeftButtonDown="DragPill" ToolTip="Right-click for Settings and Quit">
-        <Border.ContextMenu><ContextMenu><MenuItem Header="Settings" Click="OpenSettings"/><MenuItem Header="Quit Ivy Say" Click="QuitPill"/></ContextMenu></Border.ContextMenu>
+    <Border CornerRadius="37" BorderThickness="1" BorderBrush="#4F2C2F36" Background="#B21D1D1D" MouseLeftButtonDown="DragPill" ToolTip="Right-click to change style or open Settings">
+        <Border.ContextMenu><ContextMenu><MenuItem Header="Change formatting style" Click="CycleMode"/><MenuItem Header="Settings" Click="OpenSettings"/><MenuItem Header="Quit Ivy Say" Click="QuitPill"/></ContextMenu></Border.ContextMenu>
         <Grid Margin="9,0,20,0">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/><ColumnDefinition Width="68"/></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <local:ThinkingOrb Width="56" Height="56" VerticalAlignment="Center"/>
-            <Button x:Name="ModeButton" Grid.Column="2" Click="CycleMode" Content="Clean" ToolTip="Change formatting style (Ctrl + Alt + Win + M)" AutomationProperties.Name="Formatting style" VerticalAlignment="Center" Height="28" Padding="4,0" FontSize="10"/>
             <TextBlock x:Name="StatusTitle" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="Ready" Foreground="#80FBFBFB" FontSize="18" FontWeight="Normal" TextTrimming="CharacterEllipsis" ToolTip="{Binding Tag, RelativeSource={RelativeSource Self}}" AutomationProperties.Name="Dictation status"/>
         </Grid>
     </Border>

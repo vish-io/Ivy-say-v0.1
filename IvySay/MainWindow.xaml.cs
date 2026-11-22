@@ -69,7 +69,6 @@ public partial class MainWindow : Window
         selectionHotkeyRegistered = Native.RegisterHotKey(source.Handle, selectionHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x44);
         quickNoteHotkeyRegistered = Native.RegisterHotKey(source.Handle, quickNoteHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x4E);
         modeHotkeyRegistered = Native.RegisterHotKey(source.Handle, modeHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x4D);
-        ModeButton.Content = FormattingModes.Label(Preferences.Load().FormattingMode);
         currentShortcut = ShortcutBinding.From(Preferences.Load());
         string? error = ConfigureShortcut(currentShortcut, true);
         if (error != null) SetStatus("Shortcut unavailable", "Open Settings and choose another shortcut");
@@ -404,7 +403,7 @@ public partial class MainWindow : Window
             for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
-            Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
+            Native.TypeTextBatch(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
@@ -466,8 +465,8 @@ public partial class MainWindow : Window
         {
             var preferences = Preferences.Load();
             preferences.FormattingMode = FormattingModes.Next(preferences.FormattingMode);
-            preferences.Save(); ModeButton.Content = FormattingModes.Label(preferences.FormattingMode);
-            ShowPill(); SetStatus("Style: " + ModeButton.Content, "Applies when AI formatting is enabled"); ScheduleIdleHide();
+            preferences.Save();
+            ShowPill(); SetStatus("Style: " + FormattingModes.Label(preferences.FormattingMode), "Applies when AI formatting is enabled"); ScheduleIdleHide();
         }
         catch { IvyDialog.Show("Could not save formatting style.", "Ivy Say"); }
     }

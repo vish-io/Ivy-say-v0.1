@@ -108,8 +108,10 @@ Optional **Snippets** are configured in My words using one `spoken phrase => exp
 
 ### Styles, Quick Notes and sounds
 
-Use the pill badge or Ctrl+Alt+Win+M to cycle Clean, Concise and Structured for the next AI-formatted dictation. Concise and Structured can change wording or layout; review important text. Explicit opening format commands take precedence. Snippets and disabled AI formatting bypass the mode.
+Right-click the pill and choose **Change formatting style**, or use Ctrl+Alt+Win+M to cycle Clean, Concise and Structured for the next AI-formatted dictation. Concise and Structured can change wording or layout; review important text. Explicit opening format commands take precedence. Snippets and disabled AI formatting bypass the mode.
 
 Quick Notes is disabled by default. Enable it in Advanced, choose an existing folder and confirm the plaintext warning. Ctrl+Alt+Win+N starts/stops a separate note, without inserting into the focused app; audio and text still go to Groq. Completed notes append unencrypted to `inbox.md` in that folder. An append failure may leave a partial entry; check before retrying. No automatic fallback saves notes. AI formatting must be enabled.
 
 Optional sounds are off by default. Listening, completion and error cues can be enabled in Advanced; speakers may be picked up by the microphone. These extra shortcuts may be reserved or conflict with another application.
+
+In **Wait until the text is ready**, Ivy Say submits the completed output in one Windows input batch after its review and focus checks. This avoids a per-character submission loop without using the clipboard. Windows or the target app may still render characters gradually or reject part of the batch; focus can change after the checks, and no automatic retry is made after a partial submission. Direct streaming remains incremental.

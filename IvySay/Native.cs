@@ -81,4 +81,26 @@ internal static class Native
             onAccepted?.Invoke(c);
         }
     }
+    // Completed output: submit all Unicode key events together, without using the clipboard.
+    // Focus checks are best effort; focus can still change after events are queued.
+    public static void TypeTextBatch(string text, IntPtr target, IntPtr focus, Action<char>? onAccepted = null, Action? validateTarget = null)
+    {
+        BatchInsertion.Send(text, () =>
+        {
+            validateTarget?.Invoke();
+            if (target == IntPtr.Zero || GetForegroundWindow() != target || (focus != IntPtr.Zero && FocusedControl(target) != focus))
+                throw new InvalidOperationException("The target or focused control changed. Text was not inserted.");
+        }, value =>
+        {
+            var inputs = new INPUT[checked(value.Length * 2)];
+            for (int i = 0; i < value.Length; i++)
+            {
+                inputs[i * 2].type = inputs[i * 2 + 1].type = 1;
+                inputs[i * 2].data.keyboard = new KEYBDINPUT { scan = value[i], flags = 4 };
+                inputs[i * 2 + 1].data.keyboard = new KEYBDINPUT { scan = value[i], flags = 4 | 2 };
+            }
+            return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        }, onAccepted);
+    }
+
 }

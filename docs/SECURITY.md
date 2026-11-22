@@ -45,3 +45,5 @@ Ivy Say can dictate while Settings is open. For editable fields within its own S
 ## Quick Notes and style modes
 
 Quick Notes requires explicit enablement and a user-chosen folder, and appends plaintext with timestamps. Folder ACLs, backups and cloud sync may expose notes; no encryption or automatic desktop fallback is provided. Audio and transcription are still sent to Groq. A failed append may be partial and is not automatically retried. Concise and structured modes may alter wording or omit important details despite prompt instructions, so review output. Sound cues are opt-in and may be recorded by the microphone.
+
+Completed non-streaming output is submitted as one Unicode SendInput batch after the existing target and policy checks; this does not use the clipboard. Focus can change after the check or while Windows processes the queued events, and the target may process or reject them differently. A partial acceptance is treated as an uncertain insertion and is not retried automatically. Direct streaming remains incremental.
