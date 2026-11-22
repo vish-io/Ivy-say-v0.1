@@ -10,7 +10,8 @@ internal static class SelectionReader
         {
             if (target.Window == IntPtr.Zero || target.ProcessId == 0 || Native.GetForegroundWindow() != target.Window) return null;
             var focused = AutomationElement.FocusedElement;
-            if (focused == null || focused.Current.ProcessId != target.ProcessId || focused.Current.IsPassword ||
+            if (focused == null || focused.Current.ProcessId != target.ProcessId ||
+                focused.GetCurrentPropertyValue(AutomationElement.IsPasswordProperty, true) is not bool isPassword || isPassword ||
                 !focused.TryGetCurrentPattern(TextPattern.Pattern, out object pattern)) return null;
             var ranges = ((TextPattern)pattern).GetSelection();
             if (ranges.Length != 1) return null;

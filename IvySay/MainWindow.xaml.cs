@@ -128,6 +128,7 @@ public partial class MainWindow : Window
         try { value = await lookup.WaitAsync(TimeSpan.FromSeconds(2)); }
         catch (TimeoutException) { }
         catch { }
+        if (settings?.IsVisible == true) { IvyDialog.Show("Close Settings before adding a selection, so unsaved edits are not overwritten.", "Ivy Say"); return; }
         if (string.IsNullOrEmpty(value)) { IvyDialog.Show("Could not read a short text selection. Select a word or phrase in an accessible text field and try again.", "Ivy Say"); return; }
         if (IvyDialog.Show($"Add this selection to your encrypted dictionary?\n\n{value}\n\nWhen personal words are enabled, it may be sent to Groq.", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         try
