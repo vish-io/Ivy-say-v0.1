@@ -2,9 +2,13 @@
 
 Ivy Say is an unsigned MVP, not a security-certified product. Do not use it as an autonomous agent or with sensitive accounts without an independent review and testing.
 
+## Application context
+
+The optional app-context setting is off by default. When enabled with AI formatting, Ivy Say captures the foreground window and process ID when the shortcut is received and looks up only the process name asynchronously. If available and safe, the name is sent to Groq with the transcript; no window title, path, document, screen contents or field contents are collected for this feature. The lookup may be omitted if unavailable or not ready, without delaying formatting. A browser name does not identify the current site. Process names are untrusted hints and the model may still misuse them. Groq's data policies apply to app names too. This feature never relaxes insertion or review protections.
+
 ## Prompt injection and generated text
 
-The transcript is JSON-encoded as data in a user message separate from the formatter's system instructions. The prompt restricts it to editing and explicitly forbids answering questions or generating code from requests, including in Code mode. The formatter has no tools or ability to run code. JSON encoding protects the API message structure, not the model from instructions inside the data. These are mitigations, **not** guarantees: a model can still obey, hallucinate, or alter text. Treat both transcript and model output as untrusted, and review before sending, executing, or relying on them.
+The transcript is XML-character-escaped inside transcript tags in a user message separate from the formatter's system instructions; the API request itself is JSON-encoded. The prompt restricts it to editing and explicitly forbids answering questions or generating code from requests, including in Code mode. The formatter has no tools or ability to run code. JSON encoding protects the API message structure and XML escaping prevents literal transcript tags from breaking the wrapper, but neither protects the model from instructions inside the data. These are mitigations, **not** guarantees: a model can still obey, hallucinate, or alter text. Treat both transcript and model output as untrusted, and review before sending, executing, or relying on them.
 
 Ivy Say checks the foreground window and detectable Win32 focused control at insertion. Settings offer three security levels:
 

@@ -21,6 +21,24 @@ internal static class Native
     }
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
     [DllImport("user32.dll")] private static extern bool GetGUIThreadInfo(uint threadId, ref GUITHREADINFO info);
+    public static (IntPtr Window, uint ProcessId) CaptureForeground()
+    {
+        IntPtr window = GetForegroundWindow();
+        if (window == IntPtr.Zero || GetWindowThreadProcessId(window, out uint pid) == 0) return (window, 0);
+        return (window, pid);
+    }
+    public static string? ResolveProcessName((IntPtr Window, uint ProcessId) snapshot)
+    {
+        if (snapshot.Window == IntPtr.Zero || snapshot.ProcessId == 0) return null;
+        try
+        {
+            using var process = Process.GetProcessById(checked((int)snapshot.ProcessId));
+            string name = process.ProcessName;
+            if (process.HasExited || GetWindowThreadProcessId(snapshot.Window, out uint current) == 0 || current != snapshot.ProcessId) return null;
+            return AppContextData.Normalize(name);
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception or OverflowException or NotSupportedException) { return null; }
+    }
     public static IntPtr FocusedControl(IntPtr window)
     {
         uint thread = GetWindowThreadProcessId(window, out _);

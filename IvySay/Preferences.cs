@@ -19,6 +19,7 @@ internal sealed class Preferences
     public string? SecurityLevel { get; set; }
     public bool UsePersonalization { get; set; }
     public bool WarmConnection { get; set; }
+    public bool UseAppContext { get; set; }
     public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
     public bool HidePillWhenIdle { get; set; }

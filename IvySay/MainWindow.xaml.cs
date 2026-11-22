@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private Preferences? recordingPreferences;
     private PersonalizationData? recordingPersonal;
     private string? recordingKey;
+    private Task<string?>? recordingAppName;
     private IInputElement? settingsTargetElement;
     private readonly DispatcherTimer chunkTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private IntPtr target;
@@ -73,7 +74,7 @@ public partial class MainWindow : Window
         try
         {
             if (next.Hold)
-                newHook = new HoldShortcut(next, () => !busy && recorder == null && !holdSession && !shortcutCapture, () => Dispatcher.BeginInvoke(new Action(HoldPressed)), () => Dispatcher.BeginInvoke(new Action(HoldReleased)));
+                newHook = new HoldShortcut(next, () => !busy && recorder == null && !holdSession && !shortcutCapture, () => { var captured = Native.CaptureForeground(); Dispatcher.BeginInvoke(new Action(() => HoldPressed(captured))); }, () => Dispatcher.BeginInvoke(new Action(HoldReleased)));
             else if (!Native.RegisterHotKey(source.Handle, nextId, next.Modifiers | Native.MOD_NOREPEAT, (uint)next.Key))
                 return "Windows could not register this shortcut. It may be reserved or already in use; choose another. Your previous shortcut remains active.";
         }
@@ -99,14 +100,14 @@ public partial class MainWindow : Window
     }
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == hotkeyId && !currentShortcut.Hold && !shortcutCapture) { handled = true; _ = ToggleAsync(); }
+        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == hotkeyId && !currentShortcut.Hold && !shortcutCapture) { handled = true; var captured = recorder == null && !busy ? Native.CaptureForeground() : default; _ = ToggleAsync(captured); }
         return IntPtr.Zero;
     }
-    private async void HoldPressed()
+    private async void HoldPressed((IntPtr Window, uint ProcessId) captured)
     {
         if (shortcutCapture || busy || recorder != null || holdSession) return;
         holdSession = true; holdReleased = false;
-        await ToggleAsync();
+        await ToggleAsync(captured);
         if (holdReleased && recorder != null && !busy) { holdSession = false; await ToggleAsync(); }
         else if (recorder == null) holdSession = false;
     }
@@ -118,7 +119,7 @@ public partial class MainWindow : Window
         else if (!busy) holdSession = false;
     }
 
-    private async Task ToggleAsync()
+    private async Task ToggleAsync((IntPtr Window, uint ProcessId) captured = default)
     {
         if (busy) return;
         idleHideTimer.Stop();
@@ -129,7 +130,7 @@ public partial class MainWindow : Window
             string startStage = "Setup";
             try
             {
-                target = Native.GetForegroundWindow();
+                target = captured.Window;
                 if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
                 targetControl = Native.FocusedControl(target);
                 // Record the user's target before showing the non-activating pill.
@@ -149,6 +150,8 @@ public partial class MainWindow : Window
                 var personal = settingsSnapshot.UsePersonalization ? PersonalizationStore.Load() : new PersonalizationData();
                 string hints = settingsSnapshot.UsePersonalization ? PersonalizationRules.BuildPrompt(personal.Vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
                 recordingPreferences = settingsSnapshot;
+                recordingAppName = settingsSnapshot.UseAppContext && settingsSnapshot.Polish && captured.ProcessId != 0
+                    ? Task.Run(() => Native.ResolveProcessName(captured)) : null;
                 recordingPersonal = personal;
                 recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
                 chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
@@ -171,7 +174,7 @@ public partial class MainWindow : Window
                 SetStatus("Listening…", currentShortcut.Hold ? "Release your shortcut to finish" : "Press shortcut again to finish");
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
+            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
             finally { busy = false; if (recorder == null) ScheduleIdleHide(); }
             return;
         }
@@ -225,11 +228,13 @@ public partial class MainWindow : Window
                         for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
                         if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
                     }
+                    // Never wait for context lookup: omission is preferable to delaying dictation.
+                    string? appName = recordingAppName is { IsCompletedSuccessfully: true } ? recordingAppName.Result : null;
                     var formattingTimer = Stopwatch.StartNew();
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
-                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token),
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName),
                         fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -331,7 +336,7 @@ public partial class MainWindow : Window
             }
             else ShowError(ex, stage);
         }
-        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
     }
 
     private void ValidateSettingsTarget()

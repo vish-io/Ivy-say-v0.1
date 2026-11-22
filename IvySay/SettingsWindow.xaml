@@ -85,6 +85,8 @@
           <TextBlock Text="When to type" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
           <ComboBox x:Name="StreamingMode" SelectedIndex="0"><ComboBoxItem Content="Wait until the text is ready"/><ComboBoxItem Content="Type as words appear · no safety checks only"/></ComboBox>
           <TextBlock Text="Typing as words appear may leave partial text or trigger actions. Safety checks use the first option." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,7,0,0"/>
+          <CheckBox x:Name="UseAppContext" Content="Adapt formatting to the active app" Margin="0,16,0,0"/>
+          <TextBlock Text="Sends the app name to Groq with your text. No window title or screen content is sent." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
           <CheckBox x:Name="WarmConnection" Content="Prepare the connection while I speak" Margin="0,16,0,0" ToolTip="Sends an extra request to Groq when recording starts."/>
           <CheckBox x:Name="ShowComparison" Content="Show transcription and formatting details" Margin="0,16,0,0" ToolTip="Shows text and allows local audio playback after insertion."/>
         </StackPanel></Border>
