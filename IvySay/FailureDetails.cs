@@ -8,8 +8,17 @@ internal static class FailureDetails
     {
         if (error is HttpRequestException { StatusCode: not null } http)
             return $"{stage}: Groq returned HTTP {(int)http.StatusCode.Value}. Check your API key, account limits, and network connection.";
-        if (error is HttpRequestException)
-            return $"{stage}: Could not reach Groq. Check your internet connection and try again.";
+        if (error is HttpRequestException transport)
+        {
+            string cause = transport.HttpRequestError switch
+            {
+                HttpRequestError.NameResolutionError => "The Groq server name could not be resolved. Check DNS, VPN or network settings.",
+                HttpRequestError.SecureConnectionError => "A secure connection could not be established. Check your system clock, VPN or network security settings.",
+                HttpRequestError.ProxyTunnelError => "The network proxy could not connect. Check your proxy or VPN settings.",
+                _ => "Could not reach Groq. Check your internet, VPN or firewall."
+            };
+            return $"{stage}: {cause} After reconnecting, start a new dictation; you do not need to restart Ivy Say.";
+        }
         if (error is TimeoutException or OperationCanceledException)
             return stage == "Microphone" ? "Microphone: No audio arrived in time. Check Windows microphone permissions and the selected device, then try again." : $"{stage}: The request timed out. Check your connection and try again.";
         if (error is InvalidOperationException && SafeMessage(error.Message)) return $"{stage}: {error.Message}";

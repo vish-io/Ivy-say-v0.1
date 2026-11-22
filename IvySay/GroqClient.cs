@@ -7,13 +7,14 @@ using System.Text.Json;
 namespace IvySay;
 internal sealed class GroqClient : IDisposable
 {
-    // One client for the lifetime of the app retains the connection pool and TLS sessions.
-    private readonly HttpClient http;
+    private readonly GroqConnectionPool pool;
     public GroqClient(HttpMessageHandler? handler = null)
     {
-        http = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(10) })
-        { BaseAddress = new Uri("https://api.groq.com/openai/v1/"), Timeout = TimeSpan.FromSeconds(60) };
+        pool = handler == null
+            ? new GroqConnectionPool(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(10) }, observeNetwork: true)
+            : new GroqConnectionPool(() => handler, refreshable: false);
     }
+    internal GroqClient(Func<HttpMessageHandler> factory) { pool = new GroqConnectionPool(factory); }
     // This prompt is shared by both the streaming and non-streaming paths.
     private const string Prompt = """
         You are a strict speech-to-text transcript editor. The user provides raw speech inside <transcript> tags. Output ONLY the cleaned text—no quotes, tags, greetings, or commentary.
@@ -75,15 +76,17 @@ internal sealed class GroqClient : IDisposable
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        using var lease = pool.Acquire();
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, "models");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            using var response = await lease.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             if (response.IsSuccessStatusCode) await ReadBoundedAsync(response.Content, 256 * 1024, timeout.Token);
         }
-        catch (HttpRequestException) { }
-        catch (OperationCanceledException) { }
+        catch (HttpRequestException ex) { if (ex.StatusCode == null) pool.Failed(lease); }
+        catch (IOException) { pool.Failed(lease); }
+        catch (OperationCanceledException) { if (!cancellationToken.IsCancellationRequested) pool.Failed(lease); }
         catch (ObjectDisposedException) { }
         catch (InvalidOperationException) { }
     }
@@ -91,51 +94,72 @@ internal sealed class GroqClient : IDisposable
         => TranscribeAudioAsync(wav, false, key, model, language, spellingHints, cancellationToken);
     public async Task<string> TranscribeAudioAsync(byte[] wav, bool opus, string key, string model, string language, string spellingHints, CancellationToken cancellationToken)
     {
-        using var audio = new MultipartFormDataContent();
-        var file = new ByteArrayContent(wav);
-        file.Headers.ContentType = new MediaTypeHeaderValue(opus ? "audio/ogg" : "audio/wav");
-        audio.Add(file, "file", opus ? "audio.ogg" : "audio.wav");
-        audio.Add(new StringContent(model), "model");
-        audio.Add(new StringContent("json"), "response_format");
-        if (language is "en" or "hi" or "pa") audio.Add(new StringContent(language), "language");
-        if (!string.IsNullOrWhiteSpace(spellingHints)) audio.Add(new StringContent(spellingHints), "prompt");
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(60));
-        using var transcriptionRequest = new HttpRequestMessage(HttpMethod.Post, "audio/transcriptions") { Content = audio };
-        transcriptionRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        using var transcription = await http.SendAsync(transcriptionRequest, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-        await EnsureSuccess(transcription);
-        using var result = JsonDocument.Parse(await ReadBoundedAsync(transcription.Content, 256 * 1024, timeout.Token));
-        string raw = result.RootElement.GetProperty("text").GetString()?.Trim() ?? "";
-        return raw;
+        using var lease = pool.Acquire();
+        try
+        {
+            using var audio = new MultipartFormDataContent();
+            var file = new ByteArrayContent(wav);
+            file.Headers.ContentType = new MediaTypeHeaderValue(opus ? "audio/ogg" : "audio/wav");
+            audio.Add(file, "file", opus ? "audio.ogg" : "audio.wav");
+            audio.Add(new StringContent(model), "model");
+            audio.Add(new StringContent("json"), "response_format");
+            if (language is "en" or "hi" or "pa") audio.Add(new StringContent(language), "language");
+            if (!string.IsNullOrWhiteSpace(spellingHints)) audio.Add(new StringContent(spellingHints), "prompt");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            using var transcriptionRequest = new HttpRequestMessage(HttpMethod.Post, "audio/transcriptions") { Content = audio };
+            transcriptionRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            using var transcription = await lease.Client.SendAsync(transcriptionRequest, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            await EnsureSuccess(transcription);
+            using var result = JsonDocument.Parse(await ReadBoundedAsync(transcription.Content, 256 * 1024, timeout.Token));
+            string raw = result.RootElement.GetProperty("text").GetString()?.Trim() ?? "";
+            return raw;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == null) { pool.Failed(lease); throw; }
+        catch (IOException) { pool.Failed(lease); throw; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { pool.Failed(lease); throw; }
     }
     public async Task<string> PolishAsync(string raw, string key, CancellationToken cancellationToken, string? appName = null, string? vocabulary = null, string? mode = null)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(60));
-        using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions") { Content = JsonContent.Create(new { model = "openai/gpt-oss-20b", reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = TranscriptData(raw, appName, vocabulary, mode) } }, temperature = 0.1, max_completion_tokens = 2048 }) };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-        await EnsureSuccess(response);
-        using var json = JsonDocument.Parse(await ReadBoundedAsync(response.Content, 256 * 1024, timeout.Token));
-        var choice = json.RootElement.GetProperty("choices")[0];
-        if (choice.GetProperty("finish_reason").GetString() != "stop") throw new InvalidOperationException("Formatting did not complete. Please use a shorter dictation.");
-        return choice.GetProperty("message").GetProperty("content").GetString()?.Trim() ?? "";
+        using var lease = pool.Acquire();
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions") { Content = JsonContent.Create(new { model = "openai/gpt-oss-20b", reasoning_effort = "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = TranscriptData(raw, appName, vocabulary, mode) } }, temperature = 0.1, max_completion_tokens = 2048 }) };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            using var response = await lease.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            await EnsureSuccess(response);
+            using var json = JsonDocument.Parse(await ReadBoundedAsync(response.Content, 256 * 1024, timeout.Token));
+            var choice = json.RootElement.GetProperty("choices")[0];
+            if (choice.GetProperty("finish_reason").GetString() != "stop") throw new InvalidOperationException("Formatting did not complete. Please use a shorter dictation.");
+            return choice.GetProperty("message").GetProperty("content").GetString()?.Trim() ?? "";
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == null) { pool.Failed(lease); throw; }
+        catch (IOException) { pool.Failed(lease); throw; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { pool.Failed(lease); throw; }
     }
     public async Task<string> PolishStreamingAsync(string raw, string key, string model, Func<string, Task> onDelta, CancellationToken cancellationToken, string? appName = null, string? vocabulary = null, string? mode = null)
     {
-        if (model is not (FormatterRouter.Primary or FormatterRouter.Fallback or FormatterRouter.LastResort)) throw new ArgumentException("Unsupported formatting model.", nameof(model));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(60));
-        using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        using var lease = pool.Acquire();
+        try
         {
-            Content = JsonContent.Create(new { model, reasoning_effort = model == FormatterRouter.LastResort ? "none" : "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = TranscriptData(raw, appName, vocabulary, mode) } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-        await EnsureSuccess(response);
-        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-        return await StreamingCompletion.ReadAsync(stream, onDelta, timeout.Token);
+            if (model is not (FormatterRouter.Primary or FormatterRouter.Fallback or FormatterRouter.LastResort)) throw new ArgumentException("Unsupported formatting model.", nameof(model));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+            {
+                Content = JsonContent.Create(new { model, reasoning_effort = model == FormatterRouter.LastResort ? "none" : "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = Prompt }, new { role = "user", content = TranscriptData(raw, appName, vocabulary, mode) } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+            using var response = await lease.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            await EnsureSuccess(response);
+            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+            return await StreamingCompletion.ReadAsync(stream, onDelta, timeout.Token);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == null) { pool.Failed(lease); throw; }
+        catch (IOException) { pool.Failed(lease); throw; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { pool.Failed(lease); throw; }
     }
     private static async Task<byte[]> ReadBoundedAsync(HttpContent content, int maxBytes, CancellationToken token)
     {
@@ -158,5 +182,5 @@ internal sealed class GroqClient : IDisposable
         if (!response.IsSuccessStatusCode) throw new HttpRequestException("Groq request failed. Check your key, network, and Groq account limits.", null, response.StatusCode);
         return Task.CompletedTask;
     }
-    public void Dispose() => http.Dispose();
+    public void Dispose() => pool.Dispose();
 }

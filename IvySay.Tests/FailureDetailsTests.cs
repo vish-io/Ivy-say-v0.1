@@ -22,4 +22,10 @@ public class FailureDetailsTests
     {
         Assert.DoesNotContain("private", FailureDetails.Explain(new InvalidOperationException("private"), "Setup"));
     }
+    [Fact] public void ReportsDnsWithoutLeakingExceptionText()
+    {
+        var error = new HttpRequestException(HttpRequestError.NameResolutionError, "private key and transcript", null);
+        string message = FailureDetails.Explain(error, "Transcription");
+        Assert.Contains("DNS", message); Assert.Contains("restart", message); Assert.DoesNotContain("private", message);
+    }
 }

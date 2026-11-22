@@ -27,6 +27,7 @@
     <Compile Include="../IvySay/AudioSignal.cs" Link="AudioSignal.cs" />
     <Compile Include="../IvySay/AudioPayload.cs" Link="AudioPayload.cs" />
     <Compile Include="../IvySay/WavEncoder.cs" Link="WavEncoder.cs" />
+    <Compile Include="../IvySay/GroqConnectionPool.cs" Link="GroqConnectionPool.cs" />
     <Compile Include="../IvySay/GroqClient.cs" Link="GroqClient.cs" />
   </ItemGroup>
 </Project>

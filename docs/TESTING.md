@@ -101,3 +101,7 @@ Test Wait until the text is ready against Notepad, WPF editors, browsers and Uni
 ## Formatter fallback, question guard and themed controls
 
 Try questions such as “what day is it”, commands and quoted instructions in both preview and direct modes; verify recognized cases do not stream prematurely and false positives preserve the dictated text. Repeat multilingual, paraphrased, adversarial and benign samples; guard tests do not prove model safety. Test both GPT models and third fallback with a real account (preview access, pricing and behavior vary), timeouts, cancellation, partial streams and no retries after direct insertion. On Windows check right-click menu, keyboard navigation, dialog transparency, text input, selection, IME, password field, focus, disabled state and blue control glow at high DPI and reduced-motion settings.
+
+## Network reconnect
+
+On Windows start a dictation, disconnect Wi-Fi during the upload or idle, then reconnect; repeat dictations without restarting the app. Test DNS failure, VPN/proxy changes, sleep/resume and actual internet restoration. Include chunking on/off, warmup on/off, formatting in flight, HTTP auth/rate errors and direct streaming interruption. Expect old in-flight requests to complete or fail normally, new requests to use a refreshed pool, no automatic transcription retry outside the existing full-recording chunk fallback, and no duplicate insertion. If it still fails, report the sanitized stage and whether it says DNS, secure connection, proxy or generic connection; do not share keys, audio or transcripts.
