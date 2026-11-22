@@ -27,8 +27,10 @@
           <TextBlock Text="Microphone" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
           <ComboBox x:Name="Microphone" DisplayMemberPath="Label"/>
           <TextBlock Text="Keyboard shortcut" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
-          <ComboBox x:Name="Shortcut" SelectedIndex="0"><ComboBoxItem Content="Ctrl + Win + Space"/><ComboBoxItem Content="Ctrl + Shift + Space"/><ComboBoxItem Content="Alt + Shift + Space"/></ComboBox>
-          <TextBlock Text="Press the shortcut once to start, and again to finish." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
+          <Button x:Name="ShortcutCapture" Click="CaptureShortcut" PreviewKeyDown="ShortcutKeyDown" LostKeyboardFocus="ShortcutCaptureLostFocus" HorizontalAlignment="Stretch" ToolTip="Click, then press your shortcut"/>
+          <TextBlock Text="How to speak" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
+          <ComboBox x:Name="ShortcutMode" SelectedIndex="0"><ComboBoxItem Content="Press once to start and again to finish"/><ComboBoxItem Content="Hold to speak, release to finish"/></ComboBox>
+          <TextBlock Text="Choose a shortcut with a non-modifier key. In hold mode, Ivy Say consumes the chosen key while recording; modifier keys may still affect other apps. Windows may reserve some shortcuts." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
         </StackPanel></Border>
         <Border Style="{StaticResource Card}"><StackPanel>
           <CheckBox x:Name="HidePillWhenIdle" Content="Hide the pill when not in use" Margin="0,0,0,8"/>

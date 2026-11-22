@@ -10,7 +10,8 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
-    public static bool ShortcutHeld() => (GetAsyncKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x5B) & 0x8000) != 0 || (GetAsyncKeyState(0x5C) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0 || (GetAsyncKeyState(0x12) & 0x8000) != 0 || (GetAsyncKeyState(0x20) & 0x8000) != 0;
+    public static bool KeyHeld(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
+    public static bool ShortcutHeld(ShortcutBinding shortcut) => KeyHeld(shortcut.Key) || KeyHeld(0x11) || KeyHeld(0x10) || KeyHeld(0x12) || KeyHeld(0x5B) || KeyHeld(0x5C);
     [StructLayout(LayoutKind.Sequential)] private struct RECT { public int left, top, right, bottom; }
     [StructLayout(LayoutKind.Sequential)] private struct GUITHREADINFO
     {

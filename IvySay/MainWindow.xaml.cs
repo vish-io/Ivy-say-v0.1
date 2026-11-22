@@ -26,6 +26,11 @@ public partial class MainWindow : Window
     private string shortcutLabel = "Ctrl + Win + Space";
     private bool busy;
     private bool hotkeyRegistered;
+    private int hotkeyId = 1;
+    private ShortcutBinding currentShortcut;
+    private HoldShortcut? holdShortcut;
+    private bool holdSession, holdReleased;
+    private bool shortcutCapture;
     private SettingsWindow? settings;
     private NotificationArea? notificationArea;
     private HwndSource? source;
@@ -47,24 +52,72 @@ public partial class MainWindow : Window
             if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) Hide();
         };
         Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
-        Closed += (_, _) => { notificationArea?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         source.AddHook(Hook);
-        var shortcut = Preferences.Load().Shortcut;
-        uint modifiers = shortcut switch { "CtrlShiftSpace" => Native.MOD_CONTROL | Native.MOD_SHIFT, "AltShiftSpace" => Native.MOD_ALT | Native.MOD_SHIFT, _ => Native.MOD_CONTROL | Native.MOD_WIN };
-        shortcutLabel = shortcut switch { "CtrlShiftSpace" => "Ctrl + Shift + Space", "AltShiftSpace" => "Alt + Shift + Space", _ => "Ctrl + Win + Space" };
-        hotkeyRegistered = Native.RegisterHotKey(source.Handle, 1, modifiers | Native.MOD_NOREPEAT, Native.VK_SPACE);
-        if (!hotkeyRegistered) SetStatus("Shortcut unavailable", "Change shortcut in settings, then restart");
+        currentShortcut = ShortcutBinding.From(Preferences.Load());
+        string? error = ConfigureShortcut(currentShortcut, true);
+        if (error != null) SetStatus("Shortcut unavailable", "Open Settings and choose another shortcut");
         else SetStatus("Ready to listen", shortcutLabel);
+    }
+    private string? ConfigureShortcut(ShortcutBinding next, bool force = false)
+    {
+        if (source == null || !next.Valid) return "Choose a valid key along with any desired modifiers.";
+        if (!force && (busy || recorder != null || holdSession)) return "Finish the current dictation before changing its shortcut.";
+        if (!force && next == currentShortcut && hotkeyRegistered) return null;
+        HoldShortcut? newHook = null;
+        int nextId = hotkeyId == 1 ? 2 : 1;
+        try
+        {
+            if (next.Hold)
+                newHook = new HoldShortcut(next, () => !busy && recorder == null && !holdSession && !shortcutCapture, () => Dispatcher.BeginInvoke(new Action(HoldPressed)), () => Dispatcher.BeginInvoke(new Action(HoldReleased)));
+            else if (!Native.RegisterHotKey(source.Handle, nextId, next.Modifiers | Native.MOD_NOREPEAT, (uint)next.Key))
+                return "Windows could not register this shortcut. It may be reserved or already in use; choose another. Your previous shortcut remains active.";
+        }
+        catch (Exception) { newHook?.Dispose(); return "Windows could not enable hold-to-speak. Your previous shortcut remains active."; }
+        if (hotkeyRegistered && !currentShortcut.Hold) Native.UnregisterHotKey(source.Handle, hotkeyId);
+        holdShortcut?.Dispose(); holdShortcut = newHook;
+        currentShortcut = next; hotkeyId = nextId; hotkeyRegistered = true;
+        shortcutLabel = SettingsWindow.ShortcutLabel(next);
+        return null;
+    }
+    private void CaptureChanged(bool capturing)
+    {
+        shortcutCapture = capturing;
+        if (capturing)
+        {
+            if (source != null && hotkeyRegistered && !currentShortcut.Hold) Native.UnregisterHotKey(source.Handle, hotkeyId);
+            holdShortcut?.Dispose(); holdShortcut = null; hotkeyRegistered = false;
+        }
+        else if (ConfigureShortcut(currentShortcut, true) != null)
+        {
+            hotkeyRegistered = false; ShowPill(); SetStatus("Shortcut unavailable", "Choose another shortcut in Settings");
+        }
     }
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == 1) { handled = true; _ = ToggleAsync(); }
+        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == hotkeyId && !currentShortcut.Hold && !shortcutCapture) { handled = true; _ = ToggleAsync(); }
         return IntPtr.Zero;
     }
+    private async void HoldPressed()
+    {
+        if (shortcutCapture || busy || recorder != null || holdSession) return;
+        holdSession = true; holdReleased = false;
+        await ToggleAsync();
+        if (holdReleased && recorder != null && !busy) { holdSession = false; await ToggleAsync(); }
+        else if (recorder == null) holdSession = false;
+    }
+    private void HoldReleased()
+    {
+        if (!holdSession) return;
+        holdReleased = true;
+        if (!busy && recorder != null) { holdSession = false; _ = ToggleAsync(); }
+        else if (!busy) holdSession = false;
+    }
+
     private async Task ToggleAsync()
     {
         if (busy) return;
@@ -165,8 +218,8 @@ public partial class MainWindow : Window
                 {
                     if (direct)
                     {
-                        for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
-                        if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
+                        for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
+                        if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
                     }
                     var formattingTimer = Stopwatch.StartNew();
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
@@ -182,7 +235,7 @@ public partial class MainWindow : Window
                         SetStatus(direct ? "Typing…" : "Polishing…", preview);
                         if (direct)
                         {
-                            if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
+                            if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("A shortcut key was held during insertion.");
                             directAttempted = true; // Even a failed call can insert part of a fragment.
                             Native.TypeText(fragment, target, targetControl, currentWordTimer.Observe, ValidateSettingsTarget);
                         }
@@ -200,7 +253,7 @@ public partial class MainWindow : Window
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
                     {
-                        if (Native.ShortcutHeld()) throw new InvalidOperationException("A shortcut key was held during insertion.");
+                        if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("A shortcut key was held during insertion.");
                         Native.TypeText(" ", target, targetControl, currentWordTimer.Observe, ValidateSettingsTarget);
                     }
                     if (direct) currentWordTimer.Complete();
@@ -251,8 +304,8 @@ public partial class MainWindow : Window
                 return;
             }
             // Do not inject while modifiers from the shortcut are still held.
-            for (int i = 0; i < 100 && Native.ShortcutHeld(); i++) await Task.Delay(30, lifetime.Token);
-            if (Native.ShortcutHeld()) throw new InvalidOperationException("The shortcut keys were still held.");
+            for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
+            if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
             Native.TypeText(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
             if (polishedText != null) firstWordTimer?.Complete();
@@ -311,6 +364,9 @@ public partial class MainWindow : Window
         if (settings?.IsVisible == true) { settings.Activate(); return; }
         idleHideTimer.Stop();
         settings = new SettingsWindow();
+        settings.CanCaptureShortcut = () => !busy && recorder == null && !holdSession;
+        settings.ShortcutCaptureChanged = CaptureChanged;
+        settings.ApplyShortcut = binding => ConfigureShortcut(binding);
         settings.PreferencesSaved += (_, _) => { if (!Preferences.Load().HidePillWhenIdle) { idleHideTimer.Stop(); ShowPill(); } };
         settings.Closed += (_, _) => Dispatcher.BeginInvoke(new Action(ScheduleIdleHide));
         settings.Show();

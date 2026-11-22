@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using NAudio.Wave;
@@ -10,6 +11,52 @@ public partial class SettingsWindow : Window
 {
     private bool personalizationReadable = true;
     private bool initialized;
+    private bool capturingShortcut;
+    private ShortcutBinding selectedShortcut;
+    internal Func<ShortcutBinding, string?>? ApplyShortcut { get; set; }
+    internal Action<bool>? ShortcutCaptureChanged { get; set; }
+    internal Func<bool>? CanCaptureShortcut { get; set; }
+    private void CaptureShortcut(object sender, RoutedEventArgs e)
+    {
+        if (capturingShortcut) { EndCapture(); return; }
+        if (CanCaptureShortcut?.Invoke() == false) { IvyDialog.Show("Finish the current dictation before changing the shortcut.", "Ivy Say"); return; }
+        capturingShortcut = true;
+        ShortcutCaptureChanged?.Invoke(true);
+        ShortcutCapture.Content = "Press shortcut… (click to cancel)";
+        ShortcutCapture.Focus();
+    }
+    private void EndCapture()
+    {
+        if (!capturingShortcut) return;
+        capturingShortcut = false;
+        ShortcutCaptureChanged?.Invoke(false);
+        ShortcutCapture.Content = ShortcutLabel(selectedShortcut);
+    }
+    private void ShortcutCaptureLostFocus(object sender, KeyboardFocusChangedEventArgs e) => EndCapture();
+    private void ShortcutKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!capturingShortcut) return;
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        int vk = KeyInterop.VirtualKeyFromKey(key);
+        var mods = Keyboard.Modifiers;
+        uint mask = ((mods & ModifierKeys.Alt) != 0 ? 1u : 0) | ((mods & ModifierKeys.Control) != 0 ? 2u : 0) | ((mods & ModifierKeys.Shift) != 0 ? 4u : 0) | ((mods & ModifierKeys.Windows) != 0 ? 8u : 0);
+        var chosen = new ShortcutBinding(vk, mask, ShortcutMode.SelectedIndex == 1);
+        if (!chosen.Valid) return;
+        selectedShortcut = chosen;
+        EndCapture();
+        MarkDirty(this, new RoutedEventArgs(Selector.SelectionChangedEvent, ShortcutMode));
+    }
+    internal static string ShortcutLabel(ShortcutBinding binding)
+    {
+        var parts = new List<string>();
+        if ((binding.Modifiers & 2) != 0) parts.Add("Ctrl");
+        if ((binding.Modifiers & 8) != 0) parts.Add("Win");
+        if ((binding.Modifiers & 1) != 0) parts.Add("Alt");
+        if ((binding.Modifiers & 4) != 0) parts.Add("Shift");
+        parts.Add(KeyInterop.KeyFromVirtualKey(binding.Key).ToString());
+        return string.Join(" + ", parts);
+    }
     public event EventHandler? PreferencesSaved;
     private int saveVersion;
     internal bool IsSecretEditor(TextBoxBase editor) => ReferenceEquals(editor, VisibleApiKey);
@@ -97,7 +144,9 @@ public partial class SettingsWindow : Window
         UsePersonalization.IsChecked = preferences.UsePersonalization;
         try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; Corrections.Text = data.Corrections; }
         catch { personalizationReadable = false; IvyDialog.Show("Could not decrypt personalization data for this Windows account. Existing data was not changed. Delete it explicitly before creating a new profile.", "Ivy Say"); }
-        Shortcut.SelectedIndex = preferences.Shortcut switch { "CtrlShiftSpace" => 1, "AltShiftSpace" => 2, _ => 0 };
+        selectedShortcut = ShortcutBinding.From(preferences);
+        ShortcutMode.SelectedIndex = selectedShortcut.Hold ? 1 : 0;
+        ShortcutCapture.Content = ShortcutLabel(selectedShortcut);
         AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(MarkDirty));
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(MarkDirty));
         AddHandler(ToggleButton.CheckedEvent, new RoutedEventHandler(MarkDirty));
@@ -110,7 +159,7 @@ public partial class SettingsWindow : Window
                 VisibleApiKey.Visibility = Visibility.Collapsed; ApiKey.Visibility = Visibility.Visible; KeyVisibility.Content = "Show";
             }
         };
-        Closed += (_, _) => ClearKeyEditors();
+        Closed += (_, _) => { EndCapture(); ClearKeyEditors(); };
         initialized = true;
     }
     private void SavePreferences(object sender, RoutedEventArgs e)
@@ -125,11 +174,17 @@ public partial class SettingsWindow : Window
                 IvyDialog.Show("No restrictions can type generated commands, control characters, or line breaks directly into terminals and other apps. This can execute commands or send messages. Continue?", "Ivy Say · Security", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             if (StreamingMode.SelectedIndex == 1 && security == "Unrestricted" && (!existing.StreamDirect || existing.SecurityLevel != "Unrestricted") &&
                 IvyDialog.Show("Direct streaming types partial AI output immediately. It cannot be undone automatically; a failure or focus change may leave partial text, and terminal commands may run. Enable it?", "Ivy Say · Streaming", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            new Preferences { HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" } }.Save();
+            EndCapture();
+            var proposed = selectedShortcut with { Hold = ShortcutMode.SelectedIndex == 1 };
+            var oldShortcut = ShortcutBinding.From(existing);
+            string? shortcutError = proposed != oldShortcut ? ApplyShortcut?.Invoke(proposed) : null;
+            if (shortcutError != null) { IvyDialog.Show(shortcutError, "Ivy Say · Shortcut"); return; }
+            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, Shortcut = existing.Shortcut }.Save(); }
+            catch { if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut); throw; }
+            selectedShortcut = proposed;
             SavedFeedback();
             PreferencesSaved?.Invoke(this, EventArgs.Empty);
-            if (existing.Shortcut != (Shortcut.SelectedIndex switch { 1 => "CtrlShiftSpace", 2 => "AltShiftSpace", _ => "CtrlWinSpace" }))
-                IvyDialog.Show("Settings saved. Restart Ivy Say to use your new shortcut.", "Ivy Say");
+
         }
         catch { IvyDialog.Show("Could not save preferences.", "Ivy Say"); }
     }

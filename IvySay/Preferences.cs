@@ -10,6 +10,9 @@ internal sealed class Preferences
     public string Language { get; set; } = "auto";
     public string SpellingHints { get; set; } = "";
     public string Shortcut { get; set; } = "CtrlWinSpace";
+    public int ShortcutKey { get; set; }
+    public uint ShortcutModifiers { get; set; }
+    public string ShortcutMode { get; set; } = "Toggle";
     public string? Microphone { get; set; }
     // Legacy field retained for migrating existing settings.
     public bool AlwaysReview { get; set; }
@@ -40,6 +43,8 @@ internal sealed class Preferences
             value.SecurityLevel = NormalizeSecurityLevel(value.SecurityLevel, value.AlwaysReview);
             value.AlwaysReview = false;
             if (value.Shortcut is not ("CtrlWinSpace" or "CtrlShiftSpace" or "AltShiftSpace")) value.Shortcut = "CtrlWinSpace";
+            if (value.ShortcutMode is not ("Toggle" or "Hold")) value.ShortcutMode = "Toggle";
+            if (value.ShortcutKey != 0 && !ShortcutBinding.From(value).Valid) { value.ShortcutKey = 0; value.ShortcutModifiers = 0; value.ShortcutMode = "Toggle"; }
             return value;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return new Preferences { SecurityLevel = "Guarded" }; }
