@@ -10,7 +10,7 @@
       <TabItem Header="General"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel MaxWidth="620" Margin="4,16,12,8">
         <TextBlock Text="Make Ivy Say yours" FontSize="24" FontWeight="SemiBold" Foreground="#F4F6FA"/>
         <TextBlock Text="Choose how you speak and type." Foreground="#9CA3B5" Margin="0,5,0,18"/>
-        <Border Style="{StaticResource Card}"><StackPanel>
+        <Border x:Name="ConnectionCard" Style="{StaticResource Card}"><StackPanel>
           <TextBlock Text="Connect to Groq" Style="{StaticResource SectionTitle}"/>
           <TextBlock x:Name="KeyStatus" TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,8"/>
           <Expander x:Name="KeySection" Header="Manage key" Foreground="#F4F6FA">

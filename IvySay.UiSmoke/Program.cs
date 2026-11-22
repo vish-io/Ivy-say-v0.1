@@ -24,6 +24,8 @@ internal static class Program
             try
             {
                 Check(window, "General");
+                CheckCardMotion((Border)window.FindName("ConnectionCard"));
+                CheckNotificationArea();
                 var language = (ComboBox)window.FindName("SpokenLanguage");
                 language.IsDropDownOpen = true;
                 window.UpdateLayout();
@@ -49,6 +51,22 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckCardMotion(Border card)
+    {
+        if (!SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast) return;
+        if (card.Background is not DrawingBrush { Drawing: DrawingGroup group } ||
+            group.Children[1] is not GeometryDrawing { Brush: RadialGradientBrush glow } || !glow.HasAnimatedProperties)
+            throw new Exception("Card glow animation was not started");
+    }
+    private static void CheckNotificationArea()
+    {
+        var type = typeof(SettingsWindow).Assembly.GetType("IvySay.NotificationArea") ?? throw new Exception("Notification area is missing");
+        bool opened = false, quit = false;
+        using var tray = (IDisposable)(Activator.CreateInstance(type, new Action(() => opened = true), new Action(() => quit = true)) ?? throw new Exception("Notification area could not be constructed"));
+        var menu = (System.Windows.Forms.ContextMenuStrip)(type.GetField("menu", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(tray) ?? throw new Exception("Notification menu missing"));
+        menu.Items[0].PerformClick(); menu.Items[1].PerformClick();
+        if (!opened || !quit) throw new Exception("Notification area actions did not fire");
     }
     private static void CheckOrb()
     {
