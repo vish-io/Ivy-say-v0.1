@@ -22,6 +22,7 @@ internal static class FailureDetails
         "Multiple microphones have the same Windows recording name. Ivy Say cannot safely identify the selected device. Set the intended microphone as the Windows default, then select Windows default in Ivy Say." or
         "Microphone stopped before recording began. Check the selected input and Windows permissions." or
         "Microphone recording failed." or
+        "Almost no microphone signal was captured. Check the selected input, mute, Windows microphone permissions and input volume, then try again." or
         "Recording exceeded the two-minute limit. Please try a shorter dictation." or
         "Recording was too short. Please try again.";
 }

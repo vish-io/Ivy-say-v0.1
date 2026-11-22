@@ -13,6 +13,11 @@ public class FailureDetailsTests
     {
         Assert.Contains("Microphone", FailureDetails.Explain(new TimeoutException(), "Microphone"));
     }
+    [Fact] public void PreservesHelpfulSilenceDiagnostic()
+    {
+        const string message = "Almost no microphone signal was captured. Check the selected input, mute, Windows microphone permissions and input volume, then try again.";
+        Assert.Contains(message, FailureDetails.Explain(new InvalidOperationException(message), "Transcription"));
+    }
     [Fact] public void DoesNotShowUnknownExceptionText()
     {
         Assert.DoesNotContain("private", FailureDetails.Explain(new InvalidOperationException("private"), "Setup"));
