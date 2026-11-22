@@ -18,6 +18,7 @@ internal sealed class Preferences
     public bool WarmConnection { get; set; }
     public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
+    public bool HidePillWhenIdle { get; set; }
     public int CompressionKbps { get; set; }
     public int ChunkThresholdSeconds { get; set; } = 14;
     public bool EnableChunking { get; set; } = true;

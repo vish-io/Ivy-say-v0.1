@@ -1,49 +1,10 @@
-<!-- From Uiverse.io by andrew-manzyk - https://uiverse.io/andrew-manzyk/young-walrus-64
-     MIT License, Copyright (c) andrew-manzyk (Andrew Manzyk) -->
-<Window Icon="/IvySay;component/IvySay.ico" x:Class="IvySay.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:IvySay" Title="Ivy Say" Width="305" Height="82" WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True" ShowInTaskbar="True" ShowActivated="False" ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True">
-    <Window.Resources>
-        <LinearGradientBrush x:Key="PillTileSurface" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#393D4B"/><GradientStop Color="#252834" Offset="0.42"/><GradientStop Color="#181A22" Offset="1"/></LinearGradientBrush>
-        <Style x:Key="PillSettingsButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#B8C4D9"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Padding" Value="0"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" BorderThickness="1" BorderBrush="Transparent"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#252834"/><Setter TargetName="Surface" Property="BorderBrush" Value="#505A7C"/><Setter Property="Foreground" Value="#F4F6FA"/></Trigger>
-                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#A5B4FC"/></Trigger>
-                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#343A50"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-    </Window.Resources>
-    <!-- Transparent margin gives the light room to bloom without being cut off. -->
-    <Grid Margin="9" MouseLeftButtonDown="DragPill">
-        <Border CornerRadius="25" Background="#090A0E" BorderBrush="#2A2D3A" BorderThickness="1">
-            <Border.Effect><DropShadowEffect Color="#000000" BlurRadius="12" ShadowDepth="3" Opacity="0.6"/></Border.Effect>
-        </Border>
-        <Grid Margin="7,7,8,7">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/><ColumnDefinition Width="38"/></Grid.ColumnDefinitions>
-            <Grid IsHitTestVisible="False">
-                <!-- The native Uiverse loader stays intact; the frosted tile and rotating rim echo the reference toggle. -->
-                <Border Margin="1" CornerRadius="14" BorderThickness="2" BorderBrush="#5B7BFF" Opacity="0.65"><Border.Effect><BlurEffect Radius="12"/></Border.Effect></Border>
-                <Border CornerRadius="14" Background="{StaticResource PillTileSurface}" BorderBrush="#6C738D" BorderThickness="1"/>
-                <Border Margin="3,2,3,3" CornerRadius="12" BorderThickness="1.5" Opacity="0.95">
-                    <Border.BorderBrush><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><LinearGradientBrush.RelativeTransform><RotateTransform x:Name="PillRimRotate" CenterX="0.5" CenterY="0.5"/></LinearGradientBrush.RelativeTransform><GradientStop Color="#005B7BFF"/><GradientStop Color="#667C9BFF" Offset="0.42"/><GradientStop Color="#FFFFFFFF" Offset="0.5"/><GradientStop Color="#AA829BFF" Offset="0.58"/><GradientStop Color="#005B7BFF" Offset="1"/></LinearGradientBrush></Border.BorderBrush>
-                </Border>
-                <Border Margin="2" CornerRadius="13" BorderThickness="2" Opacity="0.75">
-                    <Border.BorderBrush><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><LinearGradientBrush.RelativeTransform><RotateTransform x:Name="PillBloomRotate" CenterX="0.5" CenterY="0.5"/></LinearGradientBrush.RelativeTransform><GradientStop Color="#005B7BFF"/><GradientStop Color="#AA7C9BFF" Offset="0.44"/><GradientStop Color="#FFFFFFFF" Offset="0.5"/><GradientStop Color="#AA7C9BFF" Offset="0.56"/><GradientStop Color="#005B7BFF" Offset="1"/></LinearGradientBrush></Border.BorderBrush>
-                    <Border.Effect><BlurEffect Radius="8"/></Border.Effect>
-                </Border>
-                <local:LoaderOrb Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                <Grid.Triggers><EventTrigger RoutedEvent="FrameworkElement.Loaded"><BeginStoryboard><Storyboard>
-                    <DoubleAnimation Storyboard.TargetName="PillRimRotate" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:3.2" RepeatBehavior="Forever"/>
-                    <DoubleAnimation Storyboard.TargetName="PillBloomRotate" Storyboard.TargetProperty="Angle" From="0" To="360" Duration="0:0:3.2" RepeatBehavior="Forever"/>
-                </Storyboard></BeginStoryboard></EventTrigger></Grid.Triggers>
-            </Grid>
-            <StackPanel Grid.Column="1" Margin="11,0,5,0" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusTitle" Text="Ready to listen" Foreground="#F4F6FA" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-                <TextBlock x:Name="StatusDetail" Text="Ctrl + Win + Space" Foreground="#9CA3B5" FontSize="10.5" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-            </StackPanel>
-            <Button Grid.Column="2" Content="⚙" ToolTip="Settings" AutomationProperties.Name="Settings" Click="OpenSettings" Style="{StaticResource PillSettingsButton}" FontSize="17" Width="36" Height="36" VerticalAlignment="Center"/>
+<Window Icon="/IvySay;component/IvySay.ico" x:Class="IvySay.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:IvySay" Title="Ivy Say" Width="256" Height="74" WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True" ShowInTaskbar="True" ShowActivated="False" ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <Border CornerRadius="37" BorderThickness="1" BorderBrush="#4F2C2F36" Background="#B21D1D1D" MouseLeftButtonDown="DragPill" ToolTip="Right-click for Settings and Quit">
+        <Border.ContextMenu><ContextMenu><MenuItem Header="Settings" Click="OpenSettings"/><MenuItem Header="Quit Ivy Say" Click="QuitPill"/></ContextMenu></Border.ContextMenu>
+        <Grid Margin="9,0,20,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <local:ThinkingOrb Width="56" Height="56" VerticalAlignment="Center"/>
+            <TextBlock x:Name="StatusTitle" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="Ready" Foreground="#80FBFBFB" FontSize="18" FontWeight="Normal" TextTrimming="CharacterEllipsis" ToolTip="{Binding Tag, RelativeSource={RelativeSource Self}}" AutomationProperties.Name="Dictation status"/>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

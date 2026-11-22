@@ -26,7 +26,7 @@ Use only harmless sample text. Check normal one-line dictation in Notepad remain
 
 ## Streaming output
 
-With a test Groq key and harmless dictations, verify default preview shows fragments in the pill, then inserts only once after completion. Test both levels 1 and 2 with multiline results and verify their review rules still apply. With level 0 and direct streaming enabled, use Notepad and check fragments appear incrementally, in order, without duplicate final insertion. Switch focus and disconnect the network after typing begins: verify no raw transcript is automatically inserted and the recovery window warns about already-inserted partial text. Test an error before the first fragment and the raw fallback, a long dictation, Unicode, Code/Bullet output, and optional comparison. Measure time-to-first-visible-text and total latency separately. Automated tests simulate server-sent events; they don't test live Groq, actual Windows focus behavior or partial insertion.
+With a test Groq key and harmless dictations, verify default preview shows fragments in the pill status tooltip, then inserts only once after completion. Test both levels 1 and 2 with multiline results and verify their review rules still apply. With level 0 and direct streaming enabled, use Notepad and check fragments appear incrementally, in order, without duplicate final insertion. Switch focus and disconnect the network after typing begins: verify no raw transcript is automatically inserted and the recovery window warns about already-inserted partial text. Test an error before the first fragment and the raw fallback, a long dictation, Unicode, Code/Bullet output, and optional comparison. Measure time-to-first-visible-text and total latency separately. Automated tests simulate server-sent events; they don't test live Groq, actual Windows focus behavior or partial insertion.
 
 ## First-word latency and WPM
 
@@ -50,9 +50,9 @@ Wait for Listening, then dictate a known phrase and play back the original audio
 
 On a clean account, verify General shows the key input expanded and the user can save a key, choose a language, microphone, shortcut, AI polish and insertion safety mode. On an existing account, check the key section is collapsed but can be expanded to replace or remove the key. Verify My words saves separately and the global Save settings button is hidden on that tab; General and Advanced use the same Save settings button. For every advanced setting, select a non-default value, save, close and reopen; verify the value remains unchanged. Save a General-only change and verify it does not reset hidden Advanced values or personal words. Test all three safety levels and direct typing warning; retain the privacy notices and checks. Check the shortcut restart message appears when the shortcut changes. Test scroll, keyboard navigation, focus, high-DPI scaling, narrow windows and maximized windows.
 
-## Animated pill
+## Animated pill and optional idle hiding
 
-On Windows, confirm the orb is visible in the pill, rotates and cycles colors continuously without blocking the status text, drag area, or settings button. Test idle, recording, processing, errors and completion, hotkeys while another application is focused, settings open/close, multiple DPI scales, window drag and app exit. Check the animation and glow on a low-powered machine and remote desktop. The native WPF blur/color treatment approximates CSS filter contrast/hue-rotation; visual fidelity and actual performance require an interactive Windows test.
+Verify the monochrome composing orb and single-line status against the reference, and right-click for Settings/Quit. With hiding off, the pill stays visible. With it on, close Settings and wait five seconds: the pill should hide, then the registered shortcut should show it without stealing focus and begin recording in Notepad; the next press stops recording. It must remain visible while listening or processing, show completion/errors for at least five seconds, then hide again. Reopen Settings by right-click while visible, disable hiding and confirm it stays visible. Test first-run missing key, unavailable hotkey, failed microphone startup, cancelled/review dictations, automatic stop, shutdown, multiple DPI settings, reduced-motion Windows setting and drag. Test behavior across different foreground apps and focus changes; CI cannot validate real hotkeys, microphone, focus, desktop rendering or timing.
 
 ## Dictation with settings open
 
@@ -61,10 +61,6 @@ With a test key saved, leave Settings open, focus Notepad and dictate normally w
 ## Night-mode settings appearance
 
 On Windows, inspect General, My words and Advanced at 100%, 125%, 150%, 175% and 200% DPI, including moving between monitors, minimum size, maximized size and scrolling. Confirm no clipping or footer overlap. Check keyboard-only tab navigation, dropdown selection and focus/open glow, animated chevrons, and tab transition. Test dark input contrast and disabled states. Change a setting and confirm the save glow, saved feedback and persistence; shortcut changes still require a restart. Open the key drawer and check show/hide, replacement, removal and DPAPI storage; it must not allow dictation into either representation of the key. Verify all existing security warnings, review modes, My words save/delete and Advanced options retain their behavior. The image is a single reference frame, so visually compare the animation against the original video if available; exact visual parity cannot be verified by CI.
-
-## Dark floating pill
-
-On Windows, visually check the dark frosted tile, moving ice-blue rim and bloom against the reference, at 100–200% DPI and across monitors. Verify the existing Uiverse orb still animates and is not clipped, the status and shortcut remain legible for idle, listening, processing, completion and errors, the settings button opens Settings, and dragging the pill works without interfering with the button or stealing the dictation target. Confirm the transparent glow margin does not cover nearby controls more than expected. Automated build/tests do not validate the visual result or actual focus.
 
 ## Icon and themed dialogs
 

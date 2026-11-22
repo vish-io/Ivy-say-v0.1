@@ -31,6 +31,8 @@
           <TextBlock Text="Press the shortcut once to start, and again to finish." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
         </StackPanel></Border>
         <Border Style="{StaticResource Card}"><StackPanel>
+          <CheckBox x:Name="HidePillWhenIdle" Content="Hide the pill when not in use" Margin="0,0,0,8"/>
+          <TextBlock Text="Press your shortcut to show it again. Right-click the pill for Settings and Quit." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,0,0,20"/>
           <TextBlock Text="Your text" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
           <CheckBox x:Name="Polish" Content="Make my words clear and polished" VerticalContentAlignment="Center"/>
           <TextBlock Text="How should Ivy Say insert text?" Style="{StaticResource FieldLabel}" Margin="0,18,0,7"/>

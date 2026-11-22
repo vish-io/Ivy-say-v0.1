@@ -37,6 +37,7 @@ internal static class Program
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();
                 Check(window, "Advanced");
+                CheckOrb();
                 CheckDialog(MessageBoxResult.No, "NoButton");
                 CheckDialog(MessageBoxResult.Yes, "YesButton");
                 CheckDialog(MessageBoxResult.OK, "OkButton");
@@ -48,6 +49,20 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckOrb()
+    {
+        var orb = new ThinkingOrb { Width = 56, Height = 56 };
+        orb.Measure(new Size(56, 56));
+        orb.Arrange(new Rect(0, 0, 56, 56));
+        orb.UpdateLayout();
+        var bitmap = new RenderTargetBitmap(56, 56, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(orb);
+        var bytes = new byte[56 * 56 * 4];
+        bitmap.CopyPixels(bytes, 56 * 4, 0);
+        int visible = 0;
+        for (int i = 0; i < bytes.Length; i += 4) if (bytes[i + 3] > 15) visible++;
+        if (visible < 100) throw new Exception("Thinking orb failed to render");
     }
     private static void CheckGreenCard(Border card)
     {

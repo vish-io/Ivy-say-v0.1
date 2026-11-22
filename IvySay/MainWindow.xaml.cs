@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private bool hotkeyRegistered;
     private SettingsWindow? settings;
     private HwndSource? source;
+    private readonly DispatcherTimer idleHideTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly DispatcherTimer recordingTimer = new() { Interval = TimeSpan.FromSeconds(115) };
     public MainWindow()
     {
@@ -37,8 +38,13 @@ public partial class MainWindow : Window
         chunkTimer.Tick += (_, _) => { if (recorder != null && recordingPreferences?.EnableChunking == true) chunkSession?.Update(recorder.SnapshotPcm()); };
         recordingTimer.Tick += async (_, _) => { recordingTimer.Stop(); if (recorder != null) await ToggleAsync(); };
         SourceInitialized += OnSourceInitialized;
-        Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); };
-        Closed += (_, _) => { recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        idleHideTimer.Tick += (_, _) =>
+        {
+            idleHideTimer.Stop();
+            if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true)) Hide();
+        };
+        Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
+        Closed += (_, _) => { idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -59,15 +65,18 @@ public partial class MainWindow : Window
     private async Task ToggleAsync()
     {
         if (busy) return;
+        idleHideTimer.Stop();
         if (recorder == null)
         {
-            if (!KeyStore.Exists) { ShowSettings(); return; }
+            if (!KeyStore.Exists) { ShowPill(); ShowSettings(); return; }
             busy = true;
             try
             {
                 target = Native.GetForegroundWindow();
                 if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
                 targetControl = Native.FocusedControl(target);
+                // Record the user's target before showing the non-activating pill.
+                ShowPill();
                 settingsTargetElement = null;
                 if (settings?.IsVisible == true && new WindowInteropHelper(settings).Handle == target)
                 {
@@ -104,8 +113,8 @@ public partial class MainWindow : Window
                 SetStatus("Listening…", "Press shortcut again to finish");
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowError(ex); }
-            finally { busy = false; }
+            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex); }
+            finally { busy = false; if (recorder == null) ScheduleIdleHide(); }
             return;
         }
         recordingTimer.Stop();
@@ -262,7 +271,7 @@ public partial class MainWindow : Window
             }
             else ShowError(ex);
         }
-        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; current.Dispose(); busy = false; }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
     }
 
     private void ValidateSettingsTarget()
@@ -278,7 +287,15 @@ public partial class MainWindow : Window
         if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", $"{detail} · AI → first word");
         else SetStatus("AI formatted", detail);
     }
-    private void SetStatus(string title, string detail) { StatusTitle.Text = title; StatusDetail.Text = detail; }
+    private void SetStatus(string title, string detail) { StatusTitle.Text = title; StatusTitle.Tag = detail; }
+    private void ShowPill() { if (!IsVisible) Show(); }
+    private void ScheduleIdleHide()
+    {
+        idleHideTimer.Stop();
+        // Never hide an unavailable shortcut: the user needs the pill to reach Settings.
+        if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true)) idleHideTimer.Start();
+    }
+    private void QuitPill(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
     private void ShowError(Exception ex)
     {
         SetStatus("Could not complete", "See the message for details");
@@ -289,7 +306,10 @@ public partial class MainWindow : Window
     {
         if (recorder != null || busy) { SetStatus("Finish dictation first", "Press shortcut to stop recording"); return; }
         if (settings?.IsVisible == true) { settings.Activate(); return; }
+        idleHideTimer.Stop();
         settings = new SettingsWindow();
+        settings.PreferencesSaved += (_, _) => { if (!Preferences.Load().HidePillWhenIdle) { idleHideTimer.Stop(); ShowPill(); } };
+        settings.Closed += (_, _) => Dispatcher.BeginInvoke(new Action(ScheduleIdleHide));
         settings.Show();
         settings.Activate();
     }

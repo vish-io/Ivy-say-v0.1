@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-  <ItemGroup><Resource Include="IvySay.ico" /></ItemGroup>
+  <ItemGroup><Resource Include="IvySay.ico" /><Content Include="../docs/THINKING-ORBS-LICENSE.txt" Link="THINKING-ORBS-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup>
     <PackageReference Include="Concentus.Oggfile" Version="1.0.7" />
     <PackageReference Include="NAudio" Version="2.2.1" />
