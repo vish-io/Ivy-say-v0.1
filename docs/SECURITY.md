@@ -2,6 +2,10 @@
 
 Ivy Say is an unsigned MVP, not a security-certified product. Do not use it as an autonomous agent or with sensitive accounts without an independent review and testing.
 
+## Dictionary, selection and snippets
+
+When personal words are enabled, a whole-term, 160-character maximum vocabulary hint is sent to both Whisper and the formatter. The formatter receives it as XML-escaped untrusted spelling hints; prompt injection remains possible. Explicit aliases run locally before formatting. The encrypted personalization store is cached in memory for the session. The explicit Ctrl+Alt+Win+D shortcut asks Windows UI Automation for the currently focused control's selected text only, rejects password controls, fails closed when selection is unavailable or focus changes, and asks for confirmation before storing it. It does not monitor keystrokes or use the clipboard. Accessibility providers are external and can misreport controls; use the feature only in trusted applications. Selection text appears in the confirmation dialog. The shortcut can conflict with another app. Snippets are encrypted and off by default; exact matches skip AI formatting but still pass the ordinary insertion/review checks. Expansions can contain commands, so review them before enabling this feature or inserting into sensitive destinations.
+
 ## Application context
 
 The optional app-context setting is off by default. When enabled with AI formatting, Ivy Say captures the foreground window and process ID when the shortcut is received and looks up only the process name asynchronously. If available and safe, the name is sent to Groq with the transcript; no window title, path, document, screen contents or field contents are collected for this feature. The lookup may be omitted if unavailable or not ready, without delaying formatting. A browser name does not identify the current site. Process names are untrusted hints and the model may still misuse them. Groq's data policies apply to app names too. This feature never relaxes insertion or review protections.

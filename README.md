@@ -99,3 +99,9 @@ When the Whisper transcript is already wrong, formatter changes cannot reliably 
 ### Optional app context
 
 In Advanced settings, enable **Adapt formatting to the active app** to send its process name to Groq with the transcript for AI formatting. It is off by default. The app name is captured from the foreground target at shortcut activation; no window title, file path, website, screen contents or surrounding text is collected for this feature. If the name is unavailable or not ready it is omitted without delaying dictation. A browser is identified only as the browser, not the website. Context is a formatting hint, not a guarantee of output quality or prompt-injection protection.
+
+### Personal words and snippets
+
+Enable personal words in **My words** to send bounded vocabulary hints to the formatter as well as Whisper; explicit corrections still apply before formatting. To add a selection manually, select a short word or phrase in a supported app and press **Ctrl + Alt + Win + D**, then confirm. No global typing monitor or clipboard is used; some apps do not expose selections, and Windows or another app may reserve the shortcut. Close Ivy Say Settings before using it.
+
+Optional **Snippets** are configured in My words using one `spoken phrase => expansion` per line. Enable the separate checkbox and save words and snippets. Only an exact whole-utterance match (ignoring case and final punctuation) expands; it skips the AI formatter but still uses normal insertion and review protections. Snippets are stored encrypted with your personal words. The option is off by default.

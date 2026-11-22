@@ -33,6 +33,9 @@ internal sealed class PersonalizationRules
     }
     public string Apply(string transcript) => matcher == null ? transcript : matcher.Replace(transcript, match => replacements.TryGetValue(match.Value, out string? value) ? value : match.Value);
 
+    // Whole terms only; never truncate a term or include extra spelling hints.
+    public static string FormatterVocabulary(string vocabulary) => BuildPrompt(vocabulary, "");
+
     // Prioritize whole vocabulary entries, then existing spelling hints; never cut a term mid-word.
     public static string BuildPrompt(string vocabulary, string hints)
     {

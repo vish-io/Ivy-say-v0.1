@@ -85,3 +85,7 @@ On Windows check tabs and selected dropdown items, typography, animated scrollba
 ## App context
 
 On Windows, opt in under Advanced and test toggle and hold shortcuts in multiple applications, changing focus immediately after activation. Verify Groq requests in a controlled test contain the original foreground process name only and no title, path, page or document content. Test disabled, missing/exited process, AI formatting off, unknown names, delayed lookups and fallback model; dictation must not wait on lookup or weaken insertion checks. A browser name must not imply a specific site. Never record real transcripts or credentials in test logs. Compare outputs using the same non-sensitive transcript with and without context; the model can still ignore the hint.
+
+## Personal words and snippets
+
+Verify enabled and disabled vocabulary requests and 160-character whole-term cap, hostile tag escaping and both formatter models. On Windows test Ctrl+Alt+Win+D in supported and unsupported apps, password controls, empty and long selections, focus changes, canceled confirmations, shortcut conflicts and inaccessible providers. No keystrokes or clipboard should be monitored. Confirm encrypted storage, reload and unchanged unsaved settings. For snippets test disabled, exact and near matches, formatter bypass, AI-off, guarded and review-all modes, direct streaming and focus changes. Test actual recognition separately; matching is based on Whisper's raw text.

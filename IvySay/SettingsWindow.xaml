@@ -50,13 +50,21 @@
         <Border Style="{StaticResource Card}"><StackPanel>
           <TextBlock Text="Your personal words" Style="{StaticResource SectionTitle}"/>
           <CheckBox x:Name="UsePersonalization" Content="Use my words and corrections" Margin="0,16,0,0"/>
+          <TextBlock Text="Select text in an app and press Ctrl + Alt + Win + D to add it. Some apps do not expose selections; the shortcut may conflict with another app." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,10,0,0"/>
           <TextBlock Text="Names and words · one per line" Style="{StaticResource FieldLabel}" Margin="0,20,0,7"/>
           <TextBox x:Name="Vocabulary" AcceptsReturn="True" MaxLength="1000" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
           <TextBlock Text="Words to correct · one per line" Style="{StaticResource FieldLabel}" Margin="0,18,0,7"/>
           <TextBox x:Name="Corrections" AcceptsReturn="True" MaxLength="4500" Height="120" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" ToolTip="Example: grindel wald =&gt; Grindelwald"/>
           <TextBlock Text="Example: grindel wald =&gt; Grindelwald" TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
           <TextBlock Text="Your words are encrypted on this device. When enabled, relevant words and corrected text are sent to Groq. Don't add secrets." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,14,0,0"/>
-          <WrapPanel Margin="0,16,0,0"><Button Content="Save my words" Click="SavePersonalization"/><Button Content="Delete my words" Click="DeletePersonalization" Background="#1A1D27" Foreground="#F4F6FA" Margin="8,0,0,0"/></WrapPanel>
+          <WrapPanel Margin="0,16,0,0"><Button Content="Save words and snippets" Click="SavePersonalization"/><Button Content="Delete my words" Click="DeletePersonalization" Background="#1A1D27" Foreground="#F4F6FA" Margin="8,0,0,0"/></WrapPanel>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Card}"><StackPanel>
+          <TextBlock Text="Snippets" Style="{StaticResource SectionTitle}"/>
+          <CheckBox x:Name="UseSnippets" Content="Expand exact spoken phrases without AI formatting" Margin="0,16,0,0"/>
+          <TextBlock Text="One per line: spoken phrase =&gt; text to insert" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
+          <TextBox x:Name="Snippets" AcceptsReturn="True" MaxLength="10000" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
+          <TextBlock Text="Saved encrypted with your words. Matching snippets skip AI formatting but still use insertion safety checks." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
         </StackPanel></Border>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="Advanced"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel MaxWidth="620" Margin="4,16,12,8">

@@ -27,6 +27,9 @@ public partial class MainWindow : Window
     private string shortcutLabel = "Ctrl + Win + Space";
     private bool busy;
     private bool hotkeyRegistered;
+    private bool selectionHotkeyRegistered;
+    private const int selectionHotkeyId = 9192;
+    private int selectionLookupActive;
     private int hotkeyId = 1;
     private ShortcutBinding currentShortcut;
     private HoldShortcut? holdShortcut;
@@ -53,16 +56,19 @@ public partial class MainWindow : Window
             if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) Hide();
         };
         Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
-        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); if (selectionHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, selectionHotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         source.AddHook(Hook);
+        // Load once into the encrypted store's in-memory cache; failures are surfaced when used.
+        try { PersonalizationStore.Load(); } catch { }
+        selectionHotkeyRegistered = Native.RegisterHotKey(source.Handle, selectionHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x44);
         currentShortcut = ShortcutBinding.From(Preferences.Load());
         string? error = ConfigureShortcut(currentShortcut, true);
         if (error != null) SetStatus("Shortcut unavailable", "Open Settings and choose another shortcut");
-        else SetStatus("Ready to listen", shortcutLabel);
+        else SetStatus("Ready to listen", selectionHotkeyRegistered ? shortcutLabel : "Dictionary shortcut unavailable; check for a conflict");
     }
     private string? ConfigureShortcut(ShortcutBinding next, bool force = false)
     {
@@ -100,8 +106,40 @@ public partial class MainWindow : Window
     }
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == selectionHotkeyId && selectionHotkeyRegistered && !shortcutCapture)
+        {
+            handled = true;
+            if (!busy && recorder == null) _ = AddSelectionAsync(Native.CaptureForeground());
+            return IntPtr.Zero;
+        }
         if (msg == Native.WM_HOTKEY && wParam.ToInt32() == hotkeyId && !currentShortcut.Hold && !shortcutCapture) { handled = true; var captured = recorder == null && !busy ? Native.CaptureForeground() : default; _ = ToggleAsync(captured); }
         return IntPtr.Zero;
+    }
+    private async Task AddSelectionAsync((IntPtr Window, uint ProcessId) captured)
+    {
+        if (settings?.IsVisible == true)
+        {
+            IvyDialog.Show("Close Settings before adding a selection, so unsaved edits are not overwritten.", "Ivy Say");
+            return;
+        }
+        if (Interlocked.Exchange(ref selectionLookupActive, 1) != 0) return;
+        string? value = null;
+        var lookup = Task.Run(() => { try { return SelectionReader.Read(captured); } finally { Interlocked.Exchange(ref selectionLookupActive, 0); } });
+        try { value = await lookup.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { }
+        catch { }
+        if (string.IsNullOrEmpty(value)) { IvyDialog.Show("Could not read a short text selection. Select a word or phrase in an accessible text field and try again.", "Ivy Say"); return; }
+        if (IvyDialog.Show($"Add this selection to your encrypted dictionary?\n\n{value}\n\nWhen personal words are enabled, it may be sent to Groq.", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        try
+        {
+            var data = PersonalizationStore.Load();
+            var terms = data.Vocabulary.Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (terms.Contains(value, StringComparer.OrdinalIgnoreCase)) { IvyDialog.Show("That word is already in your dictionary.", "Ivy Say"); return; }
+            data.Vocabulary = string.IsNullOrWhiteSpace(data.Vocabulary) ? value : data.Vocabulary.TrimEnd() + "\n" + value;
+            PersonalizationStore.Save(data);
+            IvyDialog.Show("Added. Enable personal words in Settings to use it for dictation.", "Ivy Say");
+        }
+        catch { IvyDialog.Show("Could not add the selection securely. Check that your dictionary is readable and has room.", "Ivy Say"); }
     }
     private async void HoldPressed((IntPtr Window, uint ProcessId) captured)
     {
@@ -147,7 +185,7 @@ public partial class MainWindow : Window
                 var settingsSnapshot = Preferences.Load();
                 string keySnapshot = KeyStore.Load();
                 recordingKey = keySnapshot;
-                var personal = settingsSnapshot.UsePersonalization ? PersonalizationStore.Load() : new PersonalizationData();
+                var personal = (settingsSnapshot.UsePersonalization || settingsSnapshot.UseSnippets) ? PersonalizationStore.Load() : new PersonalizationData();
                 string hints = settingsSnapshot.UsePersonalization ? PersonalizationRules.BuildPrompt(personal.Vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
                 recordingPreferences = settingsSnapshot;
                 recordingAppName = settingsSnapshot.UseAppContext && settingsSnapshot.Polish && captured.ProcessId != 0
@@ -208,14 +246,17 @@ public partial class MainWindow : Window
             string? polishedText = null;
             if (raw.Length == 0) { SetStatus("Nothing heard", "Try speaking a little louder"); return; }
             string corrected = preferences.UsePersonalization ? PersonalizationRules.Parse(personal.Corrections).Apply(raw) : raw;
-            recoverableText = corrected;
+            string? expansion = null;
+            bool isSnippet = preferences.UseSnippets && SnippetRules.Parse(personal.Snippets).TryMatch(raw, out expansion);
+            recoverableText = isSnippet ? expansion! : corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            if (isSnippet) structured = true; // Preserve the exact saved expansion.
             bool directComplete = false;
             var formatterChoice = FormatterSelection.Select(raw, preferences.SmartFormatterRouting, preferences.FormatterWordThreshold);
             string formattingModel = formatterChoice.Model;
             bool usedFallback = false;
             FirstWordTimer? firstWordTimer = null;
-            if (preferences.Polish)
+            if (preferences.Polish && !isSnippet)
             {
                 SetStatus("Thinking…", "Polishing your words");
                 bool direct = preferences.StreamDirect && allowUnsafeCopy;
@@ -234,7 +275,7 @@ public partial class MainWindow : Window
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
-                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName),
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, preferences.UsePersonalization ? personal.Vocabulary : null),
                         fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -299,7 +340,7 @@ public partial class MainWindow : Window
                 recoverableText = null;
                 SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -321,10 +362,11 @@ public partial class MainWindow : Window
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
             if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · {ModelLabel(formattingModel)} failed" : $"{formattingError} · formatting failed");
+            else if (isSnippet) SetStatus("Snippet inserted", "AI formatting skipped");
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

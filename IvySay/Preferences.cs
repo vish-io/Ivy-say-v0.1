@@ -18,6 +18,7 @@ internal sealed class Preferences
     public bool AlwaysReview { get; set; }
     public string? SecurityLevel { get; set; }
     public bool UsePersonalization { get; set; }
+    public bool UseSnippets { get; set; }
     public bool WarmConnection { get; set; }
     public bool UseAppContext { get; set; }
     public bool StreamDirect { get; set; }
