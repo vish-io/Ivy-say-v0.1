@@ -33,6 +33,7 @@ internal static class Program
                 tabs.SelectedIndex = 1;
                 window.UpdateLayout();
                 Check(window, "My words");
+                CheckGreenCard((Border)window.FindName("StatsCard"));
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();
                 Check(window, "Advanced");
@@ -47,6 +48,19 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckGreenCard(Border card)
+    {
+        if (card.ActualWidth < 100 || card.ActualHeight < 60) throw new Exception("Stats card did not lay out");
+        var bitmap = new RenderTargetBitmap((int)card.ActualWidth, (int)card.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(card);
+        var bytes = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
+        bitmap.CopyPixels(bytes, bitmap.PixelWidth * 4, 0);
+        int green = 0;
+        for (int i = 0; i < bytes.Length; i += 4)
+            if (bytes[i + 3] > 0 && bytes[i + 1] > bytes[i + 2] + 8 && bytes[i + 1] > bytes[i] + 2) green++;
+        Console.WriteLine($"Stats card: {green} green pixels");
+        if (green < 100) throw new Exception("Stats card green glow was not rendered");
     }
     private static void CheckDialog(MessageBoxResult expected, string buttonName)
     {

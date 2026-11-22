@@ -69,3 +69,7 @@ On Windows, visually check the dark frosted tile, moving ice-blue rim and bloom 
 ## Icon and themed dialogs
 
 Check the Ivy Say icon on the executable, taskbar, Alt+Tab and Settings title bar on Windows. Windows may cache an old taskbar icon; unpin/re-pin after updating if needed. In Settings, test Clear stats and Delete my words with Yes, No, X, Escape, and Enter: only explicit Yes should clear data. Test the security and direct-streaming warnings, error/OK messages, and duplicate-instance prompt, including keyboard-only access, long text, DPI scaling and topmost pill interaction. Confirm dialogs stay on screen, are readable, and closing a dialog does not quit the application unexpectedly. Windows CI includes an off-screen rendering and button-result smoke test, not a full desktop or accessibility test.
+
+## Green glow cards
+
+Check the green-tinted cards on General, My words and Advanced, plus confirmation dialogs, at minimum size, maximized, and different display scales. Their text, warnings and controls should remain legible over the edge glow. The seven-day WPM panel must continue showing the actual locally calculated statistic and Clear stats must still work; the reference chart's demo figures are not real Ivy Say data. Verify scrolling, text selection, dropdowns, keyboard focus, and existing save and confirmation actions. Windows CI checks that the stats card renders green; final visual fidelity and contrast require a desktop check.
