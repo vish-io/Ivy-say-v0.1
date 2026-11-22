@@ -24,6 +24,8 @@ internal static class Program
             try
             {
                 Check(window, "General");
+                if (AppCursors.Arrow == System.Windows.Input.Cursors.Arrow || AppCursors.Hand == System.Windows.Input.Cursors.Hand)
+                    throw new Exception("Custom cursor resource failed to load");
                 CheckCardMotion((Border)window.FindName("ConnectionCard"));
                 CheckNotificationArea();
                 var language = (ComboBox)window.FindName("SpokenLanguage");

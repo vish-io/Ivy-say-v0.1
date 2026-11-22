@@ -126,6 +126,7 @@ public partial class MainWindow : Window
         {
             if (!KeyStore.Exists) { ShowPill(); ShowSettings(); return; }
             busy = true;
+            string startStage = "Setup";
             try
             {
                 target = Native.GetForegroundWindow();
@@ -152,6 +153,7 @@ public partial class MainWindow : Window
                 recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
                 chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
                     (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, keySnapshot, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
+                startStage = "Microphone";
                 recorder = new AudioRecorder(settingsSnapshot.Microphone);
                 SetStatus("Preparing microphone…", "Wait for Listening before speaking");
                 await recorder.StartAsync(lifetime.Token);
@@ -169,7 +171,7 @@ public partial class MainWindow : Window
                 SetStatus("Listening…", currentShortcut.Hold ? "Release your shortcut to finish" : "Press shortcut again to finish");
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex); }
+            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
             finally { busy = false; if (recorder == null) ScheduleIdleHide(); }
             return;
         }
@@ -181,6 +183,7 @@ public partial class MainWindow : Window
         string? recoverableText = null;
         string? formattingError = null;
         bool allowUnsafeCopy = false;
+        string stage = "Microphone";
         try
         {
             SetStatus("Thinking…", "Transcribing your voice");
@@ -191,6 +194,7 @@ public partial class MainWindow : Window
             var personal = recordingPersonal!;
             string key = recordingKey!;
             allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
+            stage = "Transcription";
             var transcriptionTimer = Stopwatch.StartNew();
             if (preferences.EnableChunking) chunkSession!.Update(wav[44..]);
             string raw = await chunkSession!.FinishAsync(wav);
@@ -325,7 +329,7 @@ public partial class MainWindow : Window
                 SetStatus("Review dictation", "Text was not fully inserted");
                 new RecoveryWindow(recoverableText, "Text could not be fully inserted into the original window. Some text may already have been inserted.", allowUnsafeCopy).Show();
             }
-            else ShowError(ex);
+            else ShowError(ex, stage);
         }
         finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
     }
@@ -352,10 +356,11 @@ public partial class MainWindow : Window
         if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) idleHideTimer.Start();
     }
     private void QuitPill(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
-    private void ShowError(Exception ex)
+    private void ShowError(Exception ex, string stage)
     {
-        SetStatus("Could not complete", "See the message for details");
-        IvyDialog.Show(ex is InvalidOperationException ? ex.Message : "Something went wrong. Check microphone permissions, your key, and network connection.", "Ivy Say", MessageBoxButton.OK, MessageBoxImage.Warning);
+        string message = FailureDetails.Explain(ex, stage);
+        SetStatus(stage + " issue", message);
+        IvyDialog.Show(message, "Ivy Say · " + stage, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
     private void OpenSettings(object sender, RoutedEventArgs e) => ShowSettings();
     private void ShowSettings()

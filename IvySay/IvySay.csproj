@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup><Using Remove="System.Windows.Forms" /><Using Remove="System.Drawing" /></ItemGroup>
-  <ItemGroup><Resource Include="IvySay.ico" /><Content Include="../docs/THINKING-ORBS-LICENSE.txt" Link="THINKING-ORBS-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup><Resource Include="IvySay.ico" /><Resource Include="arrow.cur" /><Resource Include="hand.cur" /><Content Include="../docs/THINKING-ORBS-LICENSE.txt" Link="THINKING-ORBS-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup>
     <PackageReference Include="Concentus.Oggfile" Version="1.0.7" />
     <PackageReference Include="NAudio" Version="2.2.1" />
