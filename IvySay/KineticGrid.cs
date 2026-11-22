@@ -45,7 +45,7 @@ public sealed class KineticGrid : FrameworkElement
                 double ring = Math.Exp(-Math.Pow((r - age * 230) / 45, 2)) * Math.Exp(-age * 1.4) * 9;
                 px += rx / r * ring; py += ry / r * ring;
             }
-            dc.DrawEllipse(Ink, null, new Point(px, py), 1, 1);
+            dc.DrawEllipse(Ink, null, new Point(px, py), 1.5, 1.5);
         }
     }
 }
