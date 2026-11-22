@@ -105,3 +105,11 @@ In Advanced settings, enable **Adapt formatting to the active app** to send its 
 Enable personal words in **My words** to send bounded vocabulary hints to the formatter as well as Whisper; explicit corrections still apply before formatting. To add a selection manually, select a short word or phrase in a supported app and press **Ctrl + Alt + Win + D**, then confirm. No global typing monitor or clipboard is used; some apps do not expose selections, and Windows or another app may reserve the shortcut. Close Ivy Say Settings before using it.
 
 Optional **Snippets** are configured in My words using one `spoken phrase => expansion` per line. Enable the separate checkbox and save words and snippets. Only an exact whole-utterance match (ignoring case and final punctuation) expands; it skips the AI formatter but still uses normal insertion and review protections. Snippets are stored encrypted with your personal words. The option is off by default.
+
+### Styles, Quick Notes and sounds
+
+Use the pill badge or Ctrl+Alt+Win+M to cycle Clean, Concise and Structured for the next AI-formatted dictation. Concise and Structured can change wording or layout; review important text. Explicit opening format commands take precedence. Snippets and disabled AI formatting bypass the mode.
+
+Quick Notes is disabled by default. Enable it in Advanced, choose an existing folder and confirm the plaintext warning. Ctrl+Alt+Win+N starts/stops a separate note, without inserting into the focused app; audio and text still go to Groq. Completed notes append unencrypted to `inbox.md` in that folder. An append failure may leave a partial entry; check before retrying. No automatic fallback saves notes. AI formatting must be enabled.
+
+Optional sounds are off by default. Listening, completion and error cues can be enabled in Advanced; speakers may be picked up by the microphone. These extra shortcuts may be reserved or conflict with another application.

@@ -89,3 +89,7 @@ On Windows, opt in under Advanced and test toggle and hold shortcuts in multiple
 ## Personal words and snippets
 
 Verify enabled and disabled vocabulary requests and 160-character whole-term cap, hostile tag escaping and both formatter models. On Windows test Ctrl+Alt+Win+D in supported and unsupported apps, password controls, empty and long selections, focus changes, canceled confirmations, shortcut conflicts and inaccessible providers. No keystrokes or clipboard should be monitored. Confirm encrypted storage, reload and unchanged unsaved settings. For snippets test disabled, exact and near matches, formatter bypass, AI-off, guarded and review-all modes, direct streaming and focus changes. Test actual recognition separately; matching is based on Whisper's raw text.
+
+## Styles, Quick Notes and audio cues
+
+Test pill and mode hotkey through all styles, including app context and explicit format commands, snippets, disabled AI and direct streaming. Compare real transcripts for meaning preservation on both models. In Windows test explicit Quick Note shortcut with desktop/noneditable foreground, disabled and enabled settings, chosen folder, no key, microphone errors, formatting failure, folder permissions/full disk, focus changes, shortcuts held, partial writes, and no automatic file creation in ordinary dictation. Test notification and sound disabled/enabled, speakers and headphones, failures, recording startup, completion and shortcut conflicts; no success cue before completion.

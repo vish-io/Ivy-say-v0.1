@@ -95,6 +95,11 @@
           <TextBlock Text="Typing as words appear may leave partial text or trigger actions. Safety checks use the first option." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,7,0,0"/>
           <CheckBox x:Name="UseAppContext" Content="Adapt formatting to the active app" Margin="0,16,0,0"/>
           <TextBlock Text="Sends the app name to Groq with your text. No window title or screen content is sent." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <CheckBox x:Name="StatusSounds" Content="Play listening, completion and error sounds" Margin="0,16,0,0"/>
+          <CheckBox x:Name="QuickNotesEnabled" Content="Enable Quick Notes" Margin="0,16,0,0"/>
+          <TextBlock Text="Ctrl + Alt + Win + N starts or stops a Quick Note. Notes are saved unencrypted in inbox.md in your chosen folder; audio and text are sent to Groq." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <TextBox x:Name="QuickNotesFolder" IsReadOnly="True" Margin="0,8,0,0" ToolTip="Quick Notes folder"/>
+          <Button Content="Choose notes folder" Click="ChooseNotesFolder" HorizontalAlignment="Left" Margin="0,8,0,0"/>
           <CheckBox x:Name="WarmConnection" Content="Prepare the connection while I speak" Margin="0,16,0,0" ToolTip="Sends an extra request to Groq when recording starts."/>
           <CheckBox x:Name="ShowComparison" Content="Show transcription and formatting details" Margin="0,16,0,0" ToolTip="Shows text and allows local audio playback after insertion."/>
         </StackPanel></Border>

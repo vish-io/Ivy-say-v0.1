@@ -141,6 +141,9 @@ public partial class SettingsWindow : Window
         ShowComparison.IsChecked = preferences.ShowComparison;
         StreamingMode.SelectedIndex = preferences.StreamDirect ? 1 : 0;
         WarmConnection.IsChecked = preferences.WarmConnection;
+        StatusSounds.IsChecked = preferences.StatusSounds;
+        QuickNotesEnabled.IsChecked = preferences.QuickNotesEnabled;
+        QuickNotesFolder.Text = preferences.QuickNotesFolder;
         UseAppContext.IsChecked = preferences.UseAppContext;
         UsePersonalization.IsChecked = preferences.UsePersonalization;
         UseSnippets.IsChecked = preferences.UseSnippets;
@@ -169,6 +172,8 @@ public partial class SettingsWindow : Window
         try
         {
             var existing = Preferences.Load();
+            if (QuickNotesEnabled.IsChecked == true && (string.IsNullOrWhiteSpace(QuickNotesFolder.Text) || !System.IO.Directory.Exists(QuickNotesFolder.Text))) { IvyDialog.Show("Choose an existing folder for Quick Notes first.", "Ivy Say"); return; }
+            if (QuickNotesEnabled.IsChecked == true && !existing.QuickNotesEnabled && IvyDialog.Show("Quick Notes saves your dictated text unencrypted in the selected folder. Anyone with access to that folder may read it. Enable?", "Ivy Say · Quick Notes", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             if (!int.TryParse(ChunkThreshold.Text, out int threshold) || threshold < 14 || threshold > 120) { IvyDialog.Show("Chunk threshold must be between 14 and 120 seconds.", "Ivy Say"); return; }
             if (!int.TryParse(FormatterWordThreshold.Text, out int formatterThreshold) || formatterThreshold is < 20 or > 500) { IvyDialog.Show("Formatter word threshold must be between 20 and 500.", "Ivy Say"); return; }
             string security = SecurityLevel.SelectedIndex switch { 0 => "Unrestricted", 2 => "ReviewAll", _ => "Guarded" };
@@ -181,7 +186,7 @@ public partial class SettingsWindow : Window
             var oldShortcut = ShortcutBinding.From(existing);
             string? shortcutError = proposed != oldShortcut ? ApplyShortcut?.Invoke(proposed) : null;
             if (shortcutError != null) { IvyDialog.Show(shortcutError, "Ivy Say · Shortcut"); return; }
-            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, UseSnippets = existing.UseSnippets, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, Shortcut = existing.Shortcut }.Save(); }
+            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, WarmConnection = WarmConnection.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, Shortcut = existing.Shortcut }.Save(); }
             catch { if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut); throw; }
             selectedShortcut = proposed;
             SavedFeedback();
@@ -189,6 +194,11 @@ public partial class SettingsWindow : Window
 
         }
         catch { IvyDialog.Show("Could not save preferences.", "Ivy Say"); }
+    }
+    private void ChooseNotesFolder(object sender, RoutedEventArgs e)
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog { Description = "Choose where unencrypted Quick Notes are saved", UseDescriptionForTitle = true };
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK) QuickNotesFolder.Text = dialog.SelectedPath;
     }
     private void SecurityLevelChanged(object sender, SelectionChangedEventArgs e)
     {

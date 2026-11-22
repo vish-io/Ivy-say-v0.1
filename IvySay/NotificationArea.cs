@@ -20,5 +20,6 @@ internal sealed class NotificationArea : IDisposable
         icon = new Forms.NotifyIcon { Icon = image, Text = "Ivy Say — click for settings", ContextMenuStrip = menu, Visible = true };
         icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) openSettings(); };
     }
+    public void ShowSavedNote() { try { icon.ShowBalloonTip(3000, "Ivy Say", "Saved to Quick Notes", Forms.ToolTipIcon.Info); } catch { } }
     public void Dispose() { icon.Visible = false; icon.Dispose(); menu.Dispose(); image.Dispose(); }
 }

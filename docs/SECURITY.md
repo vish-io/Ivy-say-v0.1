@@ -41,3 +41,7 @@ Background chunking, enabled by default, sends completed audio segments to Groq 
 When comparison is enabled, the original recorded WAV is retained in memory until the comparison window closes, for optional local playback. Clicking play sends it to the default Windows output device, where others nearby may hear it. Ivy Say does not intentionally write it to disk. OS paging, dumps and output-device behavior are outside this guarantee.
 
 Ivy Say can dictate while Settings is open. For editable fields within its own Settings window, WPF controls share an HWND, so the app additionally checks that the same editor remains focused. It does not permit dictation into the API key field or non-editable settings controls. An in-progress recording uses the preferences and key captured at start; removing or changing the saved key affects subsequent dictations, not a request already in progress. The key remains in memory for the in-progress request, never intentionally written in plaintext.
+
+## Quick Notes and style modes
+
+Quick Notes requires explicit enablement and a user-chosen folder, and appends plaintext with timestamps. Folder ACLs, backups and cloud sync may expose notes; no encryption or automatic desktop fallback is provided. Audio and transcription are still sent to Groq. A failed append may be partial and is not automatically retried. Concise and structured modes may alter wording or omit important details despite prompt instructions, so review output. Sound cues are opt-in and may be recorded by the microphone.

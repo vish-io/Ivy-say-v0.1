@@ -28,6 +28,8 @@ public partial class MainWindow : Window
     private bool busy;
     private bool hotkeyRegistered;
     private bool selectionHotkeyRegistered;
+    private bool quickNoteHotkeyRegistered, modeHotkeyRegistered, recordingQuickNote;
+    private const int quickNoteHotkeyId = 9193, modeHotkeyId = 9194;
     private const int selectionHotkeyId = 9192;
     private int selectionLookupActive;
     private int hotkeyId = 1;
@@ -56,7 +58,7 @@ public partial class MainWindow : Window
             if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) Hide();
         };
         Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
-        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); if (selectionHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, selectionHotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); if (selectionHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, selectionHotkeyId); if (quickNoteHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, quickNoteHotkeyId); if (modeHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, modeHotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -65,10 +67,13 @@ public partial class MainWindow : Window
         // Load once into the encrypted store's in-memory cache; failures are surfaced when used.
         try { PersonalizationStore.Load(); } catch { }
         selectionHotkeyRegistered = Native.RegisterHotKey(source.Handle, selectionHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x44);
+        quickNoteHotkeyRegistered = Native.RegisterHotKey(source.Handle, quickNoteHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x4E);
+        modeHotkeyRegistered = Native.RegisterHotKey(source.Handle, modeHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x4D);
+        ModeButton.Content = FormattingModes.Label(Preferences.Load().FormattingMode);
         currentShortcut = ShortcutBinding.From(Preferences.Load());
         string? error = ConfigureShortcut(currentShortcut, true);
         if (error != null) SetStatus("Shortcut unavailable", "Open Settings and choose another shortcut");
-        else SetStatus("Ready to listen", selectionHotkeyRegistered ? shortcutLabel : "Dictionary shortcut unavailable; check for a conflict");
+        else SetStatus("Ready to listen", !selectionHotkeyRegistered || !quickNoteHotkeyRegistered || !modeHotkeyRegistered ? "A secondary shortcut is unavailable; check for conflicts" : shortcutLabel);
     }
     private string? ConfigureShortcut(ShortcutBinding next, bool force = false)
     {
@@ -80,7 +85,7 @@ public partial class MainWindow : Window
         try
         {
             if (next.Hold)
-                newHook = new HoldShortcut(next, () => !busy && recorder == null && !holdSession && !shortcutCapture, () => { var captured = Native.CaptureForeground(); Dispatcher.BeginInvoke(new Action(() => HoldPressed(captured))); }, () => Dispatcher.BeginInvoke(new Action(HoldReleased)));
+                newHook = new HoldShortcut(next, () => !busy && recorder == null && !holdSession && !shortcutCapture && !recordingQuickNote, () => { var captured = Native.CaptureForeground(); Dispatcher.BeginInvoke(new Action(() => HoldPressed(captured))); }, () => Dispatcher.BeginInvoke(new Action(HoldReleased)));
             else if (!Native.RegisterHotKey(source.Handle, nextId, next.Modifiers | Native.MOD_NOREPEAT, (uint)next.Key))
                 return "Windows could not register this shortcut. It may be reserved or already in use; choose another. Your previous shortcut remains active.";
         }
@@ -106,13 +111,22 @@ public partial class MainWindow : Window
     }
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == quickNoteHotkeyId && quickNoteHotkeyRegistered && !shortcutCapture)
+        {
+            handled = true;
+            if (!busy && (recorder == null || recordingQuickNote)) _ = ToggleAsync(default, true);
+            else if (recorder != null) SetStatus("Finish dictation first", "Quick Notes is a separate recording");
+            return IntPtr.Zero;
+        }
+        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == modeHotkeyId && modeHotkeyRegistered && !shortcutCapture)
+        { handled = true; ChangeMode(); return IntPtr.Zero; }
         if (msg == Native.WM_HOTKEY && wParam.ToInt32() == selectionHotkeyId && selectionHotkeyRegistered && !shortcutCapture)
         {
             handled = true;
             if (!busy && recorder == null) _ = AddSelectionAsync(Native.CaptureForeground());
             return IntPtr.Zero;
         }
-        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == hotkeyId && !currentShortcut.Hold && !shortcutCapture) { handled = true; var captured = recorder == null && !busy ? Native.CaptureForeground() : default; _ = ToggleAsync(captured); }
+        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == hotkeyId && !currentShortcut.Hold && !shortcutCapture) { handled = true; if (recordingQuickNote && recorder != null) { SetStatus("Quick Note recording", "Press the Quick Note shortcut again to finish"); return IntPtr.Zero; } var captured = recorder == null && !busy ? Native.CaptureForeground() : default; _ = ToggleAsync(captured); }
         return IntPtr.Zero;
     }
     private async Task AddSelectionAsync((IntPtr Window, uint ProcessId) captured)
@@ -158,7 +172,7 @@ public partial class MainWindow : Window
         else if (!busy) holdSession = false;
     }
 
-    private async Task ToggleAsync((IntPtr Window, uint ProcessId) captured = default)
+    private async Task ToggleAsync((IntPtr Window, uint ProcessId) captured = default, bool quickNote = false)
     {
         if (busy) return;
         idleHideTimer.Stop();
@@ -169,13 +183,17 @@ public partial class MainWindow : Window
             string startStage = "Setup";
             try
             {
+                recordingQuickNote = quickNote;
+                var settingsSnapshot = Preferences.Load();
+                if (quickNote && (!settingsSnapshot.QuickNotesEnabled || string.IsNullOrWhiteSpace(settingsSnapshot.QuickNotesFolder))) { recordingQuickNote = false; ShowPill(); IvyDialog.Show("Enable Quick Notes and choose a folder in Advanced settings first.", "Ivy Say"); return; }
+                if (quickNote && !settingsSnapshot.Polish) { recordingQuickNote = false; ShowPill(); IvyDialog.Show("Enable AI formatting before recording a Quick Note.", "Ivy Say"); return; }
                 target = captured.Window;
-                if (target == IntPtr.Zero || target == source?.Handle) throw new InvalidOperationException("Focus the app where you want to type first.");
-                targetControl = Native.FocusedControl(target);
+                if (!quickNote && (target == IntPtr.Zero || target == source?.Handle)) throw new InvalidOperationException("Focus the app where you want to type first.");
+                targetControl = quickNote ? IntPtr.Zero : Native.FocusedControl(target);
                 // Record the user's target before showing the non-activating pill.
                 ShowPill();
                 settingsTargetElement = null;
-                if (settings?.IsVisible == true && new WindowInteropHelper(settings).Handle == target)
+                if (!quickNote && settings?.IsVisible == true && new WindowInteropHelper(settings).Handle == target)
                 {
                     // Win32 exposes only WPF's top-level HWND, not which WPF control has focus.
                     // Do not dictate into buttons or secret-key fields, and remember the exact editor.
@@ -183,7 +201,6 @@ public partial class MainWindow : Window
                         throw new InvalidOperationException("Click an editable text box before starting dictation. The API key field cannot be used for dictation.");
                     settingsTargetElement = editor;
                 }
-                var settingsSnapshot = Preferences.Load();
                 string keySnapshot = KeyStore.Load();
                 recordingKey = keySnapshot;
                 var personal = (settingsSnapshot.UsePersonalization || settingsSnapshot.UseSnippets) ? PersonalizationStore.Load() : new PersonalizationData();
@@ -210,10 +227,11 @@ public partial class MainWindow : Window
                         catch { /* Warmup is best-effort and must never prevent recording. */ }
                     });
                 }
-                SetStatus("Listening…", currentShortcut.Hold ? "Release your shortcut to finish" : "Press shortcut again to finish");
+                SetStatus(quickNote ? "Note listening…" : "Listening…", quickNote ? "Press Quick Note shortcut again to finish" : currentShortcut.Hold ? "Release your shortcut to finish" : "Press shortcut again to finish");
+                StatusSounds.Play(settingsSnapshot.StatusSounds, 680);
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
+            catch (Exception ex) { StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250); recordingQuickNote = false; recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
             finally { busy = false; if (recorder == null) ScheduleIdleHide(); }
             return;
         }
@@ -245,13 +263,13 @@ public partial class MainWindow : Window
             TimeSpan? formattingTime = null;
             TimeSpan? firstDeltaTime = null;
             string? polishedText = null;
-            if (raw.Length == 0) { SetStatus("Nothing heard", "Try speaking a little louder"); return; }
+            if (raw.Length == 0) { StatusSounds.Play(preferences.StatusSounds, 250); SetStatus("Nothing heard", "Try speaking a little louder"); return; }
             string corrected = preferences.UsePersonalization ? PersonalizationRules.Parse(personal.Corrections).Apply(raw) : raw;
             string? expansion = null;
             bool isSnippet = preferences.UseSnippets && SnippetRules.Parse(personal.Snippets).TryMatch(raw, out expansion);
             recoverableText = isSnippet ? expansion! : corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-            if (isSnippet) structured = true; // Preserve the exact saved expansion.
+            if (isSnippet || (preferences.Polish && preferences.FormattingMode == "structured")) structured = true; // Preserve the exact saved expansion.
             bool directComplete = false;
             var formatterChoice = FormatterSelection.Select(raw, preferences.SmartFormatterRouting, preferences.FormatterWordThreshold);
             string formattingModel = formatterChoice.Model;
@@ -260,7 +278,7 @@ public partial class MainWindow : Window
             if (preferences.Polish && !isSnippet)
             {
                 SetStatus("Thinking…", "Polishing your words");
-                bool direct = preferences.StreamDirect && allowUnsafeCopy;
+                bool direct = preferences.StreamDirect && allowUnsafeCopy && !recordingQuickNote;
                 bool directAttempted = false;
                 var streamed = new StringBuilder();
                 try
@@ -276,7 +294,7 @@ public partial class MainWindow : Window
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
-                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, preferences.UsePersonalization ? personal.Vocabulary : null),
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, preferences.UsePersonalization ? personal.Vocabulary : null, preferences.FormattingMode),
                         fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -317,6 +335,7 @@ public partial class MainWindow : Window
                 {
                     if (directAttempted)
                     {
+                        StatusSounds.Play(preferences.StatusSounds, 250);
                         SetStatus("Stream interrupted", "Check text already inserted");
                         new RecoveryWindow(streamed.ToString(), "Streaming stopped before completion. Some or all of this partial text may already be in the original app. Check it before copying; do not blindly paste it again.", allowUnsafeCopy).Show();
                         recoverableText = null;
@@ -335,11 +354,38 @@ public partial class MainWindow : Window
                     };
                 }
             }
+            if (recordingQuickNote)
+            {
+                if (formattingError != null)
+                {
+                    SetStatus("Note not saved", "Formatting failed; review your text");
+                    StatusSounds.Play(preferences.StatusSounds, 250);
+                    new RecoveryWindow(recoverableText!, "Quick Note formatting failed, so nothing was saved. Review and copy if needed.", allowUnsafeCopy).Show();
+                    recoverableText = null;
+                    return;
+                }
+                try { await QuickNotes.AppendAsync(preferences.QuickNotesFolder, recoverableText!, DateTimeOffset.Now, lifetime.Token); }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    SetStatus("Note save failed", "Check your notes folder");
+                    StatusSounds.Play(preferences.StatusSounds, 250);
+                    new RecoveryWindow(recoverableText!, "Quick Note could not be saved completely. The file may contain a partial entry; check it before copying or retrying.", allowUnsafeCopy).Show();
+                    recoverableText = null;
+                    return;
+                }
+                _ = UsageStatistics.Default.RecordAsync(recoverableText!, recordingDuration, DateTime.Now);
+                recoverableText = null;
+                SetStatus("Note saved", "Saved to inbox.md");
+                notificationArea?.ShowSavedNote();
+                StatusSounds.Play(preferences.StatusSounds, 900);
+                return;
+            }
             if (directComplete)
             {
                 _ = UsageStatistics.Default.RecordAsync(polishedText!, recordingDuration, DateTime.Now);
                 recoverableText = null;
                 SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
+                StatusSounds.Play(preferences.StatusSounds, 900);
                 if (preferences.ShowComparison)
                     new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
                 return;
@@ -362,6 +408,7 @@ public partial class MainWindow : Window
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
+            StatusSounds.Play(preferences.StatusSounds, 900);
             if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · {ModelLabel(formattingModel)} failed" : $"{formattingError} · formatting failed");
             else if (isSnippet) SetStatus("Snippet inserted", "AI formatting skipped");
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
@@ -372,6 +419,7 @@ public partial class MainWindow : Window
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250);
             if (recoverableText != null)
             {
                 SetStatus("Review dictation", "Text was not fully inserted");
@@ -379,7 +427,7 @@ public partial class MainWindow : Window
             }
             else ShowError(ex, stage);
         }
-        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingQuickNote = false; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
     }
 
     private void ValidateSettingsTarget()
@@ -409,6 +457,19 @@ public partial class MainWindow : Window
         string message = FailureDetails.Explain(ex, stage);
         SetStatus(stage + " issue", message);
         IvyDialog.Show(message, "Ivy Say · " + stage, MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+    private void CycleMode(object sender, RoutedEventArgs e) => ChangeMode();
+    private void ChangeMode()
+    {
+        if (busy || recorder != null) { ShowPill(); SetStatus("Finish dictation first", "Style applies to the next recording"); return; }
+        try
+        {
+            var preferences = Preferences.Load();
+            preferences.FormattingMode = FormattingModes.Next(preferences.FormattingMode);
+            preferences.Save(); ModeButton.Content = FormattingModes.Label(preferences.FormattingMode);
+            ShowPill(); SetStatus("Style: " + ModeButton.Content, "Applies when AI formatting is enabled"); ScheduleIdleHide();
+        }
+        catch { IvyDialog.Show("Could not save formatting style.", "Ivy Say"); }
     }
     private void OpenSettings(object sender, RoutedEventArgs e) => ShowSettings();
     private void ShowSettings()

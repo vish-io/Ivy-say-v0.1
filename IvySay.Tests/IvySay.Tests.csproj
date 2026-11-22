@@ -5,6 +5,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <Compile Include="../IvySay/FormattingModes.cs" Link="FormattingModes.cs" />
+    <Compile Include="../IvySay/QuickNotes.cs" Link="QuickNotes.cs" />
     <Compile Include="../IvySay/SnippetRules.cs" Link="SnippetRules.cs" />
     <Compile Include="../IvySay/AppContextData.cs" Link="AppContextData.cs" />
     <Compile Include="../IvySay/FailureDetails.cs" Link="FailureDetails.cs" />

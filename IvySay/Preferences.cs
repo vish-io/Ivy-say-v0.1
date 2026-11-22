@@ -20,6 +20,10 @@ internal sealed class Preferences
     public bool UsePersonalization { get; set; }
     public bool UseSnippets { get; set; }
     public bool WarmConnection { get; set; }
+    public string FormattingMode { get; set; } = "clean";
+    public bool QuickNotesEnabled { get; set; }
+    public string QuickNotesFolder { get; set; } = "";
+    public bool StatusSounds { get; set; }
     public bool UseAppContext { get; set; }
     public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
@@ -37,6 +41,8 @@ internal sealed class Preferences
         {
             var value = JsonSerializer.Deserialize<Preferences>(File.ReadAllText(FilePath)) ?? new Preferences();
             if (value.TranscriptionModel is not ("whisper-large-v3" or "whisper-large-v3-turbo")) value.TranscriptionModel = "whisper-large-v3";
+            value.FormattingMode = FormattingModes.Normalize(value.FormattingMode);
+            value.QuickNotesFolder ??= "";
             if (value.Language is not ("auto" or "en" or "hi" or "pa")) value.Language = "auto";
             if (value.SpellingHints is null || value.SpellingHints.Length > 160) value.SpellingHints = "";
             if (value.CompressionKbps is not (0 or 24 or 32 or 48)) value.CompressionKbps = 0;
