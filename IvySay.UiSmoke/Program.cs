@@ -40,6 +40,7 @@ internal static class Program
                 window.UpdateLayout();
                 Check(window, "Advanced");
                 CheckOrb();
+                CheckHoldEvents();
                 CheckDialog(MessageBoxResult.No, "NoButton");
                 CheckDialog(MessageBoxResult.Yes, "YesButton");
                 CheckDialog(MessageBoxResult.OK, "OkButton");
@@ -51,6 +52,29 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckHoldEvents()
+    {
+        var assembly = typeof(SettingsWindow).Assembly;
+        var bindingType = assembly.GetType("IvySay.ShortcutBinding")!;
+        object binding = Activator.CreateInstance(bindingType, 0x78, 0u, true)!;
+        var hookType = assembly.GetType("IvySay.HoldShortcut")!;
+        int starts = 0, stops = 0;
+        using var hook = (IDisposable)Activator.CreateInstance(hookType, binding, new Func<bool>(() => true), new Action(() => starts++), new Action(() => stops++))!;
+        var onKey = hookType.GetMethod("OnKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        IntPtr data = System.Runtime.InteropServices.Marshal.AllocHGlobal(32);
+        try
+        {
+            for (int i = 0; i < 32; i++) System.Runtime.InteropServices.Marshal.WriteByte(data, i, 0);
+            System.Runtime.InteropServices.Marshal.WriteInt32(data, 0, 0x78);
+            IntPtr Fire(int message) => (IntPtr)onKey.Invoke(hook, new object[] { 0, new IntPtr(message), data })!;
+            if (Fire(0x100) != new IntPtr(1) || Fire(0x100) != new IntPtr(1) || Fire(0x101) != new IntPtr(1) || starts != 1 || stops != 1)
+                throw new Exception("Hold trigger repeat/release handling failed");
+            System.Runtime.InteropServices.Marshal.WriteInt32(data, 8, 0x10);
+            Fire(0x100); Fire(0x101);
+            if (starts != 1 || stops != 1) throw new Exception("Injected input triggered hold-to-speak");
+        }
+        finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(data); }
     }
     private static void CheckCardMotion(Border card)
     {

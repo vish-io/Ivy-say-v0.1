@@ -166,7 +166,7 @@ public partial class MainWindow : Window
                         catch { /* Warmup is best-effort and must never prevent recording. */ }
                     });
                 }
-                SetStatus("Listening…", "Press shortcut again to finish");
+                SetStatus("Listening…", currentShortcut.Hold ? "Release your shortcut to finish" : "Press shortcut again to finish");
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (Exception ex) { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex); }
