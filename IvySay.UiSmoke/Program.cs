@@ -27,6 +27,9 @@ internal static class Program
                 if (AppCursors.Arrow == System.Windows.Input.Cursors.Arrow || AppCursors.Hand == System.Windows.Input.Cursors.Hand)
                     throw new Exception("Custom cursor resource failed to load");
                 CheckCardMotion((Border)window.FindName("ConnectionCard"));
+                var save = (Button)window.FindName("GeneralSettingsSave");
+                save.ApplyTemplate();
+                if (save.Template.FindName("Shine", save) is not Border) throw new Exception("Button glow missing");
                 CheckNotificationArea();
                 var language = (ComboBox)window.FindName("SpokenLanguage");
                 language.IsDropDownOpen = true;
@@ -37,6 +40,9 @@ internal static class Program
                 tabs.SelectedIndex = 1;
                 window.UpdateLayout();
                 Check(window, "My words");
+                var vocabulary = (TextBox)window.FindName("Vocabulary");
+                vocabulary.ApplyTemplate();
+                if (vocabulary.Template.FindName("PART_ContentHost", vocabulary) == null || vocabulary.Template.FindName("Shine", vocabulary) == null) throw new Exception("Text field template missing content host or glow");
                 CheckGreenCard((Border)window.FindName("StatsCard"));
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();

@@ -269,6 +269,8 @@ public partial class MainWindow : Window
             recoverableText = isSnippet ? expansion! : corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             if (isSnippet || (preferences.Polish && preferences.FormattingMode == "structured")) structured = true; // Preserve the exact saved expansion.
+            bool guardedQuestion = DictationGuard.RequiresGuard(corrected);
+            bool protectedOutput = false;
             bool directComplete = false;
             var formatterChoice = FormatterSelection.Select(raw, preferences.SmartFormatterRouting, preferences.FormatterWordThreshold);
             string formattingModel = formatterChoice.Model;
@@ -277,7 +279,7 @@ public partial class MainWindow : Window
             if (preferences.Polish && !isSnippet)
             {
                 SetStatus("Thinking…", "Polishing your words");
-                bool direct = preferences.StreamDirect && allowUnsafeCopy && !recordingQuickNote;
+                bool direct = preferences.StreamDirect && allowUnsafeCopy && !recordingQuickNote && !guardedQuestion;
                 bool directAttempted = false;
                 var streamed = new StringBuilder();
                 try
@@ -300,7 +302,7 @@ public partial class MainWindow : Window
                         streamed.Append(fragment);
                         int start = Math.Max(0, streamed.Length - 90);
                         string preview = streamed.ToString(start, streamed.Length - start).Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
-                        SetStatus(direct ? "Typing…" : "Polishing…", preview);
+                        SetStatus(direct ? "Typing…" : "Polishing…", guardedQuestion ? "Checking your dictation" : preview);
                         if (direct)
                         {
                             if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("A shortcut key was held during insertion.");
@@ -312,11 +314,10 @@ public partial class MainWindow : Window
                     () =>
                     {
                         usedFallback = true;
-                        formattingModel = FormatterRouter.OtherModel(formatterChoice.Model);
                         streamed.Clear();
                         firstDeltaTime = null;
-                        SetStatus("Switching model…", $"Trying {ModelLabel(formattingModel)}");
-                    }, direct, lifetime.Token, formatterChoice.Model);
+                        SetStatus("Switching formatter…", "Trying another formatter");
+                    }, direct, lifetime.Token, formatterChoice.Model, model => formattingModel = model);
                     formattingTime = formattingTimer.Elapsed;
                     if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
@@ -327,7 +328,15 @@ public partial class MainWindow : Window
                     if (direct) currentWordTimer.Complete();
                     directComplete = direct;
                     polishedText = direct ? polished : polished.Trim();
-                    recoverableText = polishedText;
+                    if (guardedQuestion && !DictationGuard.IsConsistent(corrected, polishedText))
+                    {
+                        // The text was buffered, so no answer has been inserted or saved.
+                        protectedOutput = true;
+                        polishedText = null;
+                        formattingError = "Formatter output rejected; dictated text preserved";
+                        recoverableText = DictationGuard.SafeText(corrected);
+                    }
+                    else recoverableText = polishedText;
                 }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
                 catch (Exception ex)
@@ -355,7 +364,7 @@ public partial class MainWindow : Window
             }
             if (recordingQuickNote)
             {
-                if (formattingError != null)
+                if (formattingError != null && !protectedOutput)
                 {
                     SetStatus("Note not saved", "Formatting failed; review your text");
                     StatusSounds.Play(preferences.StatusSounds, 250);
@@ -386,7 +395,7 @@ public partial class MainWindow : Window
                 SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
                 StatusSounds.Play(preferences.StatusSounds, 900);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, ModelLabel(formattingModel), usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -408,12 +417,13 @@ public partial class MainWindow : Window
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
             StatusSounds.Play(preferences.StatusSounds, 900);
-            if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · {ModelLabel(formattingModel)} failed" : $"{formattingError} · formatting failed");
+            if (protectedOutput) SetStatus("Dictation preserved", "A possible answer was rejected");
+            else if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · {ModelLabel(formattingModel)} failed" : $"{formattingError} · formatting failed");
             else if (isSnippet) SetStatus("Snippet inserted", "AI formatting skipped");
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, formattingModel, usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, ModelLabel(formattingModel), usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)
@@ -435,10 +445,10 @@ public partial class MainWindow : Window
             SettingsTargetGuard.Validate(settingsTargetElement, Keyboard.FocusedElement, settings?.IsVisible == true, settings?.IsActive == true);
     }
 
-    private static string ModelLabel(string model) => model == FormatterRouter.Fallback ? "GPT-OSS 120B" : "GPT-OSS 20B";
+    private static string ModelLabel(string model) => model == FormatterRouter.LastResort ? "Backup formatter" : model == FormatterRouter.Fallback ? "GPT-OSS 120B" : "GPT-OSS 20B";
     private void SetCompletionStatus(FirstWordTimer? timer, string model, bool usedFallback)
     {
-        string detail = (model == FormatterRouter.Fallback ? "120B" : "20B") + (usedFallback ? " fallback" : "");
+        string detail = (model == FormatterRouter.LastResort ? "Backup formatter" : model == FormatterRouter.Fallback ? "120B" : "20B") + (usedFallback ? " fallback" : "");
         if (timer?.FirstWord is TimeSpan elapsed) SetStatus($"Done in {elapsed.TotalSeconds:F1}s", $"{detail} · AI → first word");
         else SetStatus("AI formatted", detail);
     }

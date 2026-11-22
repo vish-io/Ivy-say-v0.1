@@ -29,7 +29,8 @@ public static class ComboGlow
             var rotation = new RotateTransform(0, 0.5, 0.5);
             mutable.RelativeTransform = rotation;
             border.BorderBrush = mutable;
-            rotation.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(3.2)) { RepeatBehavior = RepeatBehavior.Forever });
+            if (SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast)
+                rotation.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(3.2)) { RepeatBehavior = RepeatBehavior.Forever });
         }
     }
     private static void Stop(object sender, RoutedEventArgs e)

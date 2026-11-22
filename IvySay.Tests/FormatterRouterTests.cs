@@ -92,14 +92,14 @@ public class FormatterRouterTests
         Assert.Equal(1, calls);
     }
     [Fact]
-    public async Task DoesNotRetryFallbackItself()
+    public async Task StopsAfterThirdFormatter()
     {
         int calls = 0;
         await Assert.ThrowsAsync<HttpRequestException>(() => FormatterRouter.RunAsync((_, _, _) =>
         {
             calls++; throw new HttpRequestException("limited", null, HttpStatusCode.TooManyRequests);
         }, _ => Task.CompletedTask, () => { }, false, CancellationToken.None));
-        Assert.Equal(2, calls);
+        Assert.Equal(3, calls);
     }
     [Fact]
     public async Task LiveRequestShapeUsesFallbackModelWithSameFormattingParameters()
@@ -200,6 +200,23 @@ public class FormatterRouterTests
         Assert.Equal("Use method X.", result);
         Assert.True(switched);
         Assert.Equal(new[] { FormatterRouter.Fallback, FormatterRouter.Primary }, models);
+    }
+
+    [Fact] public async Task ThirdFallbackUsesQwenAfterBothEligibleFailures()
+    {
+        var calls = new List<string>(); var switches = new List<string>();
+        string text = await FormatterRouter.RunAsync((model, _, _) => { calls.Add(model); if (model != FormatterRouter.LastResort) throw new HttpRequestException("rate", null, HttpStatusCode.TooManyRequests); return Task.FromResult("ok"); }, _ => Task.CompletedTask, () => { }, false, CancellationToken.None, FormatterRouter.Fallback, switches.Add);
+        Assert.Equal("ok", text); Assert.Equal(new[] { FormatterRouter.Fallback, FormatterRouter.Primary, FormatterRouter.LastResort }, calls); Assert.Equal(new[] { FormatterRouter.Primary, FormatterRouter.LastResort }, switches);
+    }
+    [Fact] public async Task QwenRequestUsesNonReasoningMode()
+    {
+        using var client = new GroqClient(new StubHandler(async (request, token) => {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+            Assert.Equal("none", body.RootElement.GetProperty("reasoning_effort").GetString());
+            Assert.Equal(FormatterRouter.LastResort, body.RootElement.GetProperty("model").GetString());
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", Encoding.UTF8, "text/event-stream") };
+        }));
+        Assert.Equal("ok", await client.PolishStreamingAsync("hello", "key", FormatterRouter.LastResort, _ => Task.CompletedTask, CancellationToken.None));
     }
 
 }

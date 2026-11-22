@@ -97,3 +97,7 @@ Test pill and mode hotkey through all styles, including app context and explicit
 ## Buffered insertion and cues
 
 Test Wait until the text is ready against Notepad, WPF editors, browsers and Unicode/emoji text, including large text, multiline, guarded review, focus switching, elevated targets and partial/blocked input. SendInput acceptance is not proof of target rendering. Confirm direct streaming remains incremental and that partial failures are never automatically retried. Test sounds at different volume levels and speakers/headphones; sounds remain optional and may be recorded by the microphone. Check the style option on the pill context menu and Ctrl+Alt+Win+M.
+
+## Formatter fallback, question guard and themed controls
+
+Try questions such as “what day is it”, commands and quoted instructions in both preview and direct modes; verify recognized cases do not stream prematurely and false positives preserve the dictated text. Repeat multilingual, paraphrased, adversarial and benign samples; guard tests do not prove model safety. Test both GPT models and third fallback with a real account (preview access, pricing and behavior vary), timeouts, cancellation, partial streams and no retries after direct insertion. On Windows check right-click menu, keyboard navigation, dialog transparency, text input, selection, IME, password field, focus, disabled state and blue control glow at high DPI and reduced-motion settings.

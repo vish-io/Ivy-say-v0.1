@@ -9,6 +9,7 @@ internal static class FormatterRouter
 {
     public const string Primary = "openai/gpt-oss-20b";
     public const string Fallback = "openai/gpt-oss-120b";
+    public const string LastResort = "qwen/qwen3.8-27b";
     public static string OtherModel(string selected) => selected switch
     {
         Primary => Fallback,
@@ -21,7 +22,7 @@ internal static class FormatterRouter
         Action onFallback,
         bool directTyping,
         CancellationToken token,
-        string initialModel = Primary)
+        string initialModel = Primary, Action<string>? onModelChange = null)
     {
         string alternateModel = OtherModel(initialModel);
         bool directOutputPossible = false;
@@ -31,12 +32,16 @@ internal static class FormatterRouter
             if (directTyping && text.Length > 0) directOutputPossible = true;
             await onDelta(text);
         }
-        try { return await invoke(initialModel, Forward, token); }
-        catch (Exception ex) when (!token.IsCancellationRequested && !directOutputPossible && IsRetryable(ex))
+        string[] sequence = { initialModel, alternateModel, LastResort };
+        for (int i = 0; ; i++)
         {
-            token.ThrowIfCancellationRequested();
-            onFallback();
-            return await invoke(alternateModel, Forward, token);
+            try { return await invoke(sequence[i], Forward, token); }
+            catch (Exception ex) when (i < sequence.Length - 1 && !token.IsCancellationRequested && !directOutputPossible && IsRetryable(ex))
+            {
+                token.ThrowIfCancellationRequested();
+                onFallback();
+                onModelChange?.Invoke(sequence[i + 1]);
+            }
         }
     }
     private static bool IsRetryable(Exception ex) => ex switch
