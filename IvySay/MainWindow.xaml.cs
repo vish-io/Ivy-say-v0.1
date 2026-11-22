@@ -27,12 +27,15 @@ public partial class MainWindow : Window
     private bool busy;
     private bool hotkeyRegistered;
     private SettingsWindow? settings;
+    private NotificationArea? notificationArea;
     private HwndSource? source;
     private readonly DispatcherTimer idleHideTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly DispatcherTimer recordingTimer = new() { Interval = TimeSpan.FromSeconds(115) };
     public MainWindow()
     {
         InitializeComponent();
+        try { notificationArea = new NotificationArea(ShowSettings, () => Application.Current.Shutdown()); }
+        catch { notificationArea = null; } // Do not hide the only UI if the tray icon cannot be created.
         Left = SystemParameters.WorkArea.Right - Width - 32;
         Top = SystemParameters.WorkArea.Bottom - Height - 32;
         chunkTimer.Tick += (_, _) => { if (recorder != null && recordingPreferences?.EnableChunking == true) chunkSession?.Update(recorder.SnapshotPcm()); };
@@ -41,10 +44,10 @@ public partial class MainWindow : Window
         idleHideTimer.Tick += (_, _) =>
         {
             idleHideTimer.Stop();
-            if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true)) Hide();
+            if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) Hide();
         };
         Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
-        Closed += (_, _) => { idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        Closed += (_, _) => { notificationArea?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, 1); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -293,7 +296,7 @@ public partial class MainWindow : Window
     {
         idleHideTimer.Stop();
         // Never hide an unavailable shortcut: the user needs the pill to reach Settings.
-        if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true)) idleHideTimer.Start();
+        if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) idleHideTimer.Start();
     }
     private void QuitPill(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
     private void ShowError(Exception ex)
@@ -304,7 +307,7 @@ public partial class MainWindow : Window
     private void OpenSettings(object sender, RoutedEventArgs e) => ShowSettings();
     private void ShowSettings()
     {
-        if (recorder != null || busy) { SetStatus("Finish dictation first", "Press shortcut to stop recording"); return; }
+        if (recorder != null || busy) { ShowPill(); SetStatus("Finish dictation first", "Press shortcut to stop recording"); return; }
         if (settings?.IsVisible == true) { settings.Activate(); return; }
         idleHideTimer.Stop();
         settings = new SettingsWindow();

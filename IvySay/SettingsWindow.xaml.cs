@@ -57,7 +57,7 @@ public partial class SettingsWindow : Window
         ApiKey.Clear(); VisibleApiKey.Clear(); VisibleApiKey.Visibility = Visibility.Collapsed;
         ApiKey.Visibility = Visibility.Visible; KeyVisibility.Content = "Show";
     }
-    private sealed record MicrophoneOption(string Label, string? DeviceName);
+    private sealed record MicrophoneOption(string Label, string? DeviceName) { public override string ToString() => Label; }
     public SettingsWindow()
     {
         InitializeComponent(); RefreshStatus(); RefreshStats(); KeySection.IsExpanded = !KeyStore.Exists;
