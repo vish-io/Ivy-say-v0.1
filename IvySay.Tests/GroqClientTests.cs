@@ -210,9 +210,9 @@ public class GroqClientTests
         Assert.Equal("ok", await client.PolishStreamingAsync("hello & goodbye", "test-key", FormatterRouter.Fallback, _ => Task.CompletedTask, CancellationToken.None, supplied));
         Assert.Equal(2, calls);
     }
-    [Fact] public void AppContextIsOffByDefault()
+    [Fact] public void AppContextIsEnabledByDefault()
     {
-        Assert.False(new Preferences().UseAppContext);
+        Assert.True(new Preferences().UseAppContext);
         Assert.Null(AppContextData.Normalize(new string('a', 81)));
         Assert.Null(AppContextData.Normalize("éditeur"));
     }

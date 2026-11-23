@@ -24,6 +24,7 @@ internal static class Program
             try
             {
                 Check(window, "General");
+                if (((ComboBox)window.FindName("SpokenLanguage")).SelectedIndex != 1 || ((ComboBox)window.FindName("SecurityLevel")).SelectedIndex != 0 || ((CheckBox)window.FindName("Polish")).IsChecked != true) throw new Exception("New installation general defaults are incorrect");
                 if (AppCursors.Arrow == System.Windows.Input.Cursors.Arrow || AppCursors.Hand == System.Windows.Input.Cursors.Hand)
                     throw new Exception("Custom cursor resource failed to load");
                 CheckCardMotion((Border)window.FindName("ConnectionCard"));
@@ -48,6 +49,7 @@ internal static class Program
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();
                 Check(window, "Advanced");
+                if (((ComboBox)window.FindName("Model")).SelectedIndex != 1 || ((ComboBox)window.FindName("Compression")).SelectedIndex != 1 || ((TextBox)window.FindName("FormatterWordThreshold")).Text != "40" || ((CheckBox)window.FindName("UseAppContext")).IsChecked != true || ((CheckBox)window.FindName("StatusSounds")).IsChecked != true || window.FindName("WarmConnection") != null) throw new Exception("New installation advanced defaults are incorrect");
                 CheckOrb();
                 CheckHoldEvents();
                 CheckDialog(MessageBoxResult.No, "NoButton");

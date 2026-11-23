@@ -8,7 +8,7 @@ public class QuickNotesAndModesTests
         Assert.Equal("concise", FormattingModes.Next("clean"));
         Assert.Equal("structured", FormattingModes.Next("concise"));
         Assert.Equal("clean", FormattingModes.Next("structured"));
-        var p = new Preferences(); Assert.False(p.QuickNotesEnabled); Assert.False(p.StatusSounds);
+        var p = new Preferences(); Assert.False(p.QuickNotesEnabled); Assert.True(p.StatusSounds);
     }
     [Fact] public async Task NotesAppendToExplicitFolderAndRejectMissingFolder()
     {

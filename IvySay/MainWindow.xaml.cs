@@ -217,15 +217,12 @@ public partial class MainWindow : Window
                 await recorder.StartAsync(lifetime.Token);
                 recordingTimer.Start();
                 chunkTimer.Start();
-                if (settingsSnapshot.WarmConnection)
+                CancellationToken token = lifetime.Token;
+                _ = Task.Run(async () =>
                 {
-                    CancellationToken token = lifetime.Token;
-                    _ = Task.Run(async () =>
-                    {
-                        try { await groq.WarmConnectionAsync(keySnapshot, token); }
-                        catch { /* Warmup is best-effort and must never prevent recording. */ }
-                    });
-                }
+                    try { await groq.WarmConnectionAsync(keySnapshot, token); }
+                    catch { /* Warmup is best-effort and must never prevent recording. */ }
+                });
                 SetStatus(quickNote ? "Note listening…" : "Listening…", quickNote ? "Press Quick Note shortcut again to finish" : currentShortcut.Hold ? "Release your shortcut to finish" : "Press shortcut again to finish");
                 StatusSounds.Play(settingsSnapshot.StatusSounds, 680);
             }

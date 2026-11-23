@@ -46,7 +46,7 @@ public class FormatterSelectionTests
     [Fact]
     public void InvalidThresholdDefaultsTo120AndOldSettingsEnableRouting()
     {
-        var prefs = JsonSerializer.Deserialize<Preferences>("{\"Polish\":true}")!;
+        var prefs = Preferences.ParseExisting("{\"Polish\":true}");
         Assert.True(prefs.SmartFormatterRouting);
         Assert.Equal(120, prefs.FormatterWordThreshold);
         string text = string.Join(" ", Enumerable.Repeat("word", 30));

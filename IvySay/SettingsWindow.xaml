@@ -24,7 +24,7 @@
         <Border Style="{StaticResource Card}"><StackPanel>
           <TextBlock Text="Your voice" Style="{StaticResource SectionTitle}" Margin="0,0,0,18"/>
           <TextBlock Text="Language you speak" Style="{StaticResource FieldLabel}"/>
-          <ComboBox x:Name="SpokenLanguage" SelectedIndex="0"><ComboBoxItem Content="Detect automatically"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox>
+          <ComboBox x:Name="SpokenLanguage" SelectedIndex="1"><ComboBoxItem Content="Detect automatically"/><ComboBoxItem Content="English"/><ComboBoxItem Content="Hindi"/><ComboBoxItem Content="Punjabi"/></ComboBox>
           <TextBlock Text="Microphone" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
           <ComboBox x:Name="Microphone" DisplayMemberPath="Label"/>
           <TextBlock Text="Keyboard shortcut" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
@@ -39,7 +39,7 @@
           <TextBlock Text="Your text" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
           <CheckBox x:Name="Polish" Content="Make my words clear and polished" VerticalContentAlignment="Center"/>
           <TextBlock Text="How should Ivy Say insert text?" Style="{StaticResource FieldLabel}" Margin="0,18,0,7"/>
-          <ComboBox x:Name="SecurityLevel" SelectedIndex="1" SelectionChanged="SecurityLevelChanged"><ComboBoxItem Content="Type automatically · no safety checks"/><ComboBoxItem Content="Type with safety checks · recommended"/><ComboBoxItem Content="Let me review and copy every time"/></ComboBox>
+          <ComboBox x:Name="SecurityLevel" SelectedIndex="0" SelectionChanged="SecurityLevelChanged"><ComboBoxItem Content="Type automatically · no safety checks"/><ComboBoxItem Content="Type with safety checks · recommended"/><ComboBoxItem Content="Let me review and copy every time"/></ComboBox>
           <TextBlock x:Name="SecurityDescription" TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
         </StackPanel></Border>
       </StackPanel></ScrollViewer></TabItem>
@@ -73,9 +73,9 @@
         <Border Style="{StaticResource Card}"><StackPanel>
           <TextBlock Text="Voice recognition" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
           <TextBlock Text="Recognition model" Style="{StaticResource FieldLabel}"/>
-          <ComboBox x:Name="Model" SelectedIndex="0"><ComboBoxItem Content="More detailed · Whisper v3"/><ComboBoxItem Content="Faster · Whisper Turbo"/></ComboBox>
+          <ComboBox x:Name="Model" SelectedIndex="1"><ComboBoxItem Content="More detailed · Whisper v3"/><ComboBoxItem Content="Faster · Whisper Turbo"/></ComboBox>
           <TextBlock Text="Audio compression · recordings of 8 seconds or more" Style="{StaticResource FieldLabel}" Margin="0,16,0,7" TextWrapping="Wrap"/>
-          <ComboBox x:Name="Compression" SelectedIndex="0"><ComboBoxItem Content="Off · original audio"/><ComboBoxItem Content="Smaller audio · Opus 24 kbps"/><ComboBoxItem Content="Smaller audio · Opus 32 kbps"/><ComboBoxItem Content="Smaller audio · Opus 48 kbps"/></ComboBox>
+          <ComboBox x:Name="Compression" SelectedIndex="1"><ComboBoxItem Content="Off · original audio"/><ComboBoxItem Content="Smaller audio · Opus 24 kbps"/><ComboBoxItem Content="Smaller audio · Opus 32 kbps"/><ComboBoxItem Content="Smaller audio · Opus 48 kbps"/></ComboBox>
           <CheckBox x:Name="EnableChunking" Content="Process long recordings while I speak" Margin="0,16,0,0"/>
           <TextBlock Text="When enabled, audio may be sent to Groq before you finish and may use extra requests." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
           <TextBlock Text="Start after this many seconds (14–120)" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
@@ -100,7 +100,6 @@
           <TextBlock Text="Ctrl + Alt + Win + N starts or stops a Quick Note. Notes are saved unencrypted in inbox.md in your chosen folder; audio and text are sent to Groq." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
           <TextBox x:Name="QuickNotesFolder" IsReadOnly="True" Margin="0,8,0,0" ToolTip="Quick Notes folder"/>
           <Button Content="Choose notes folder" Click="ChooseNotesFolder" HorizontalAlignment="Left" Margin="0,8,0,0"/>
-          <CheckBox x:Name="WarmConnection" Content="Prepare the connection while I speak" Margin="0,16,0,0" ToolTip="Sends an extra request to Groq when recording starts."/>
           <CheckBox x:Name="ShowComparison" Content="Show transcription and formatting details" Margin="0,16,0,0" ToolTip="Shows text and allows local audio playback after insertion."/>
         </StackPanel></Border>
       </StackPanel></ScrollViewer></TabItem>

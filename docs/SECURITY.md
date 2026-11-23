@@ -8,7 +8,7 @@ When personal words are enabled, a whole-term, 160-character maximum vocabulary 
 
 ## Application context
 
-The optional app-context setting is off by default. When enabled with AI formatting, Ivy Say captures the foreground window and process ID when the shortcut is received and looks up only the process name asynchronously. If available and safe, the name is sent to Groq with the transcript; no window title, path, document, screen contents or field contents are collected for this feature. The lookup may be omitted if unavailable or not ready, without delaying formatting. A browser name does not identify the current site. Process names are untrusted hints and the model may still misuse them. Groq's data policies apply to app names too. This feature never relaxes insertion or review protections.
+The app-context setting is on by default for new installations. When enabled with AI formatting, Ivy Say captures the foreground window and process ID when the shortcut is received and looks up only the process name asynchronously. If available and safe, the name is sent to Groq with the transcript; no window title, path, document, screen contents or field contents are collected for this feature. The lookup may be omitted if unavailable or not ready, without delaying formatting. A browser name does not identify the current site. Process names are untrusted hints and the model may still misuse them. Groq's data policies apply to app names too. This feature never relaxes insertion or review protections.
 
 ## Prompt injection and generated text
 
@@ -17,7 +17,7 @@ The transcript is XML-character-escaped inside transcript tags in a user message
 Ivy Say checks the foreground window and detectable Win32 focused control at insertion. Settings offer three security levels:
 
 - **0 · No restrictions:** no automatic content, terminal, or unverified-target review, including unsafe controls and multiline output. Commands or line breaks can execute actions or send messages. The original foreground window and any detectable focused control must still match; operating system failures can still prevent insertion. Review-window copying is not blocked for unsafe characters in this mode.
-- **1 · Guarded review (default):** known terminal processes, unverified targets, and output with line breaks, tabs or unsafe characters are held for manual review.
+- **1 · Guarded review:** known terminal processes, unverified targets, and output with line breaks, tabs or unsafe characters are held for manual review.
 - **2 · Review every dictation:** all output is held for manual review.
 
 Some IDE terminals, browsers, remote desktops, password fields, inaccessible controls, app-internal focus changes, and renamed terminal processes cannot be reliably recognized. Focus can also change between checks. Guarded mode is a best-effort blocklist, not a sandbox or allowlist. For sensitive work, use level 2 and check the destination and content. Pasting into a terminal can execute commands, especially with line breaks. Clipboard history and other applications may read copied content.
