@@ -1,6 +1,6 @@
 <Window Icon="/IvySay;component/IvySay.ico" x:Class="IvySay.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:IvySay" Cursor="{x:Static local:AppCursors.Arrow}" Title="Ivy Say · Settings" Width="760" Height="740" MinWidth="520" MinHeight="540" WindowStartupLocation="CenterScreen" Background="{DynamicResource SettingsBackdrop}" Foreground="#F4F6FA" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13" UseLayoutRounding="True" SnapsToDevicePixels="True">
   <Window.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="NightGlowTheme.xaml"/></ResourceDictionary.MergedDictionaries></ResourceDictionary></Window.Resources>
-  <Grid><local:KineticGrid/>
+  <Grid><local:KineticGrid x:Name="KineticBackground"/>
   <Grid Margin="24,20">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

@@ -119,3 +119,5 @@ In **Wait until the text is ready**, Ivy Say submits the completed output in one
 ### After an internet interruption
 
 Ivy Say refreshes its connection pool after transport failures and Windows network-address changes, without canceling other in-flight requests. After reconnecting, start a new dictation; a failed recording is not automatically resent, and its audio is not saved. Existing long-recording chunk fallback may retry the complete recording as described above. A working general internet connection does not guarantee Groq is reachable: DNS, VPN, proxy, TLS or firewall settings may still block it.
+
+The Settings background is a native WPF adaptation of the user-supplied Kinetic Grid reference (21st.dev/@satoriui/components/kinetic-grid): dim grid lines and nodes warp and glow near the cursor, with click ripples. It is decorative, does not capture input, stops animating when settled or hidden, and honors Windows reduced-motion settings.

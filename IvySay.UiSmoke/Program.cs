@@ -27,6 +27,7 @@ internal static class Program
                 if (AppCursors.Arrow == System.Windows.Input.Cursors.Arrow || AppCursors.Hand == System.Windows.Input.Cursors.Hand)
                     throw new Exception("Custom cursor resource failed to load");
                 CheckCardMotion((Border)window.FindName("ConnectionCard"));
+                CheckKineticGrid((KineticGrid)window.FindName("KineticBackground"));
                 var save = (Button)window.FindName("GeneralSettingsSave");
                 save.ApplyTemplate();
                 if (save.Template.FindName("Shine", save) is not Border) throw new Exception("Button glow missing");
@@ -60,6 +61,29 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckKineticGrid(KineticGrid grid)
+    {
+        if (grid.IsHitTestVisible || grid.ActualWidth < 100 || grid.ActualHeight < 100) throw new Exception("Kinetic background must fill the window without intercepting input");
+        var type = typeof(KineticGrid);
+        if (SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast)
+        {
+            type.GetField("mouse", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(grid, new Point(grid.ActualWidth / 2, grid.ActualHeight / 2));
+            type.GetField("inside", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(grid, true);
+        }
+        grid.InvalidateVisual(); grid.UpdateLayout();
+        var bitmap = new RenderTargetBitmap((int)grid.ActualWidth, (int)grid.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(grid);
+        var bytes = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4]; bitmap.CopyPixels(bytes, bitmap.PixelWidth * 4, 0);
+        int background = 0, lines = 0, blue = 0;
+        for (int i = 0; i < bytes.Length; i += 4)
+        {
+            if (bytes[i] == 24 && bytes[i + 1] == 22 && bytes[i + 2] == 22) background++;
+            if (bytes[i] > 35 && Math.Abs(bytes[i + 1] - bytes[i + 2]) < 3 && Math.Abs(bytes[i] - bytes[i + 1]) < 3) lines++;
+            if (bytes[i] > bytes[i + 1] + 25 && bytes[i + 1] > bytes[i + 2] + 20) blue++;
+        }
+        if (background < 1000 || lines < 100) throw new Exception($"Kinetic grid backdrop or lines missing: {background}/{lines}");
+        if (SystemParameters.ClientAreaAnimation && !SystemParameters.HighContrast && blue < 30) throw new Exception($"Kinetic grid active blue nodes missing: {blue}");
     }
     private static void CheckHoldEvents()
     {
