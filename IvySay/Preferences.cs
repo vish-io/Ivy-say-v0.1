@@ -17,6 +17,7 @@ internal sealed class Preferences
     // Legacy field retained for migrating existing settings.
     public bool AlwaysReview { get; set; }
     public string? SecurityLevel { get; set; } = "Unrestricted";
+    public bool LearnCorrections { get; set; }
     public bool UsePersonalization { get; set; }
     public bool UseSnippets { get; set; }
     public string FormattingMode { get; set; } = "clean";

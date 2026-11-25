@@ -60,6 +60,14 @@
           <WrapPanel Margin="0,16,0,0"><Button Content="Save words and snippets" Click="SavePersonalization"/><Button Content="Delete my words" Click="DeletePersonalization" Background="#1A1D27" Foreground="#F4F6FA" Margin="8,0,0,0"/></WrapPanel>
         </StackPanel></Border>
         <Border Style="{StaticResource Card}"><StackPanel>
+          <TextBlock Text="Learn from corrections" Style="{StaticResource SectionTitle}"/>
+          <CheckBox x:Name="LearnCorrections" Content="Learn words from my edits" Margin="0,16,0,0"/>
+          <TextBlock Text="When enabled, Ivy Say briefly reads a small area around its recent insertion in supported text fields to detect spelling edits. Learned words are encrypted on this device and may be sent to Groq as hints. Password fields are excluded. This works only for some fields, not direct streaming or Quick Notes." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,10,0,0"/>
+          <TextBlock Text="Learned words · remove any you don't want" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
+          <TextBox x:Name="LearnedWords" AcceptsReturn="True" MaxLength="1000" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
+          <Button Content="Save learning settings and words" Click="SavePersonalization" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+        </StackPanel></Border>
+        <Border Style="{StaticResource Card}"><StackPanel>
           <TextBlock Text="Snippets" Style="{StaticResource SectionTitle}"/>
           <CheckBox x:Name="UseSnippets" Content="Expand exact spoken phrases without AI formatting" Margin="0,16,0,0"/>
           <TextBlock Text="One per line: spoken phrase =&gt; text to insert" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>

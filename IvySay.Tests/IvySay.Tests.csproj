@@ -5,6 +5,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <Compile Include="../IvySay/CorrectionLearning.cs" Link="CorrectionLearning.cs" />
+    <Compile Include="../IvySay/FormatterFidelity.cs" Link="FormatterFidelity.cs" />
     <Compile Include="../IvySay/DictationGuard.cs" Link="DictationGuard.cs" />
     <Compile Include="../IvySay/BatchInsertion.cs" Link="BatchInsertion.cs" />
     <Compile Include="../IvySay/FormattingModes.cs" Link="FormattingModes.cs" />

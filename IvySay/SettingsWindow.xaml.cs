@@ -63,7 +63,7 @@ public partial class SettingsWindow : Window
     private void MarkDirty(object sender, RoutedEventArgs e)
     {
         if (!initialized || e.OriginalSource is not (ComboBox or CheckBox or TextBox) ||
-            e.OriginalSource == VisibleApiKey || e.OriginalSource == Vocabulary || e.OriginalSource == Corrections || e.OriginalSource == Snippets || e.OriginalSource == UseSnippets || e.OriginalSource == UsePersonalization) return;
+            e.OriginalSource == VisibleApiKey || e.OriginalSource == Vocabulary || e.OriginalSource == Corrections || e.OriginalSource == Snippets || e.OriginalSource == UseSnippets || e.OriginalSource == UsePersonalization || e.OriginalSource == LearnCorrections || e.OriginalSource == LearnedWords) return;
         saveVersion++;
         GeneralSettingsSave.Content = "Save settings";
         var glow = new System.Windows.Media.Effects.DropShadowEffect { Color = (Color)ColorConverter.ConvertFromString("#5B7BFF"), BlurRadius = 14, ShadowDepth = 0 };
@@ -145,8 +145,9 @@ public partial class SettingsWindow : Window
         QuickNotesFolder.Text = preferences.QuickNotesFolder;
         UseAppContext.IsChecked = preferences.UseAppContext;
         UsePersonalization.IsChecked = preferences.UsePersonalization;
+        LearnCorrections.IsChecked = preferences.LearnCorrections;
         UseSnippets.IsChecked = preferences.UseSnippets;
-        try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; Corrections.Text = data.Corrections; Snippets.Text = data.Snippets; }
+        try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; LearnedWords.Text = data.LearnedWords; Corrections.Text = data.Corrections; Snippets.Text = data.Snippets; }
         catch { personalizationReadable = false; IvyDialog.Show("Could not decrypt personalization data for this Windows account. Existing data was not changed. Delete it explicitly before creating a new profile.", "Ivy Say"); }
         selectedShortcut = ShortcutBinding.From(preferences);
         ShortcutMode.SelectedIndex = selectedShortcut.Hold ? 1 : 0;
@@ -185,7 +186,7 @@ public partial class SettingsWindow : Window
             var oldShortcut = ShortcutBinding.From(existing);
             string? shortcutError = proposed != oldShortcut ? ApplyShortcut?.Invoke(proposed) : null;
             if (shortcutError != null) { IvyDialog.Show(shortcutError, "Ivy Say · Shortcut"); return; }
-            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, Shortcut = existing.Shortcut }.Save(); }
+            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, LearnCorrections = existing.LearnCorrections, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, Shortcut = existing.Shortcut }.Save(); }
             catch { if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut); throw; }
             selectedShortcut = proposed;
             SavedFeedback();
@@ -245,9 +246,10 @@ public partial class SettingsWindow : Window
         if (!personalizationReadable) { IvyDialog.Show("Existing personalization could not be read. Delete it explicitly before saving a new profile.", "Ivy Say"); return; }
         try
         {
-            PersonalizationStore.Save(new PersonalizationData { Vocabulary = Vocabulary.Text.Trim(), Corrections = Corrections.Text.Trim(), Snippets = Snippets.Text.Trim() });
+            PersonalizationStore.Save(new PersonalizationData { Vocabulary = Vocabulary.Text.Trim(), LearnedWords = LearnedWords.Text.Trim(), Corrections = Corrections.Text.Trim(), Snippets = Snippets.Text.Trim() });
             var preferences = Preferences.Load();
             preferences.UsePersonalization = UsePersonalization.IsChecked == true;
+            preferences.LearnCorrections = LearnCorrections.IsChecked == true;
             preferences.UseSnippets = UseSnippets.IsChecked == true;
             preferences.Save();
             IvyDialog.Show("Personalization saved. It applies to the next dictation when enabled.", "Ivy Say");
@@ -257,12 +259,12 @@ public partial class SettingsWindow : Window
     }
     private void DeletePersonalization(object sender, RoutedEventArgs e)
     {
-        if (IvyDialog.Show("Delete your saved vocabulary, corrections and snippets from this device?", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (IvyDialog.Show("Delete your saved vocabulary, learned words, corrections and snippets from this device?", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         try
         {
             PersonalizationStore.Delete();
-            var preferences = Preferences.Load(); preferences.UsePersonalization = false; preferences.UseSnippets = false; preferences.Save();
-            Vocabulary.Clear(); Corrections.Clear(); Snippets.Clear(); UseSnippets.IsChecked = false; UsePersonalization.IsChecked = false; personalizationReadable = true;
+            var preferences = Preferences.Load(); preferences.UsePersonalization = false; preferences.LearnCorrections = false; preferences.UseSnippets = false; preferences.Save();
+            Vocabulary.Clear(); LearnedWords.Clear(); Corrections.Clear(); Snippets.Clear(); UseSnippets.IsChecked = false; UsePersonalization.IsChecked = false; LearnCorrections.IsChecked = false; personalizationReadable = true;
         }
         catch { IvyDialog.Show("Could not remove personalization data or update settings.", "Ivy Say"); }
     }

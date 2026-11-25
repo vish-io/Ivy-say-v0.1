@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private const int quickNoteHotkeyId = 9193, modeHotkeyId = 9194;
     private const int selectionHotkeyId = 9192;
     private int selectionLookupActive;
+    private int learningGeneration;
     private int hotkeyId = 1;
     private ShortcutBinding currentShortcut;
     private HoldShortcut? holdShortcut;
@@ -177,6 +178,7 @@ public partial class MainWindow : Window
         idleHideTimer.Stop();
         if (recorder == null)
         {
+            learningGeneration++; // A new dictation invalidates any pending edit observation.
             if (!KeyStore.Exists) { ShowPill(); ShowSettings(); return; }
             busy = true;
             string startStage = "Setup";
@@ -202,8 +204,9 @@ public partial class MainWindow : Window
                 }
                 string keySnapshot = KeyStore.Load();
                 recordingKey = keySnapshot;
-                var personal = (settingsSnapshot.UsePersonalization || settingsSnapshot.UseSnippets) ? PersonalizationStore.Load() : new PersonalizationData();
-                string hints = settingsSnapshot.UsePersonalization ? PersonalizationRules.BuildPrompt(personal.Vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
+                var personal = (settingsSnapshot.UsePersonalization || settingsSnapshot.UseSnippets || settingsSnapshot.LearnCorrections) ? PersonalizationStore.Load() : new PersonalizationData();
+                string vocabulary = string.Join("\n", new[] { settingsSnapshot.UsePersonalization ? personal.Vocabulary : "", settingsSnapshot.LearnCorrections ? personal.LearnedWords : "" }.Where(x => x.Length > 0));
+                string hints = vocabulary.Length > 0 ? PersonalizationRules.BuildPrompt(vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
                 recordingPreferences = settingsSnapshot;
                 recordingAppName = settingsSnapshot.UseAppContext && settingsSnapshot.Polish && captured.ProcessId != 0
                     ? Task.Run(() => Native.ResolveProcessName(captured)) : null;
@@ -248,6 +251,7 @@ public partial class MainWindow : Window
             TimeSpan recordingDuration = TimeSpan.FromSeconds((wav.Length - 44) / 32000d);
             var preferences = recordingPreferences!;
             var personal = recordingPersonal!;
+            string formatterVocabulary = string.Join("\n", new[] { preferences.UsePersonalization ? personal.Vocabulary : "", preferences.LearnCorrections ? personal.LearnedWords : "" }.Where(x => x.Length > 0));
             string key = recordingKey!;
             allowUnsafeCopy = preferences.SecurityLevel == "Unrestricted";
             stage = "Transcription";
@@ -292,7 +296,7 @@ public partial class MainWindow : Window
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
-                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, preferences.UsePersonalization ? personal.Vocabulary : null, preferences.FormattingMode),
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, formatterVocabulary, preferences.FormattingMode),
                         fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -315,8 +319,29 @@ public partial class MainWindow : Window
                         firstDeltaTime = null;
                         SetStatus("Switching formatter…", "Trying another formatter");
                     }, direct, lifetime.Token, formatterChoice.Model, model => formattingModel = model);
+                    if (!direct)
+                    {
+                        var checkedResult = await FormatterFidelity.CheckAsync(corrected, polished, preferences.FormattingMode, async token =>
+                        {
+                            streamed.Clear();
+                            firstDeltaTime = null;
+                            SetStatus("Checking dictation…", "Refining your words");
+                            return await groq.PolishStreamingAsync(corrected, key, formattingModel, fragment =>
+                            {
+                                firstDeltaTime ??= formattingTimer.Elapsed;
+                                return Task.CompletedTask;
+                            }, token, appName, formatterVocabulary, preferences.FormattingMode, strict: true);
+                        }, lifetime.Token);
+                        if (checkedResult.Rejected)
+                        {
+                            protectedOutput = true;
+                            formattingError = "Formatter output rejected; dictated text preserved";
+                            recoverableText = DictationGuard.SafeText(corrected);
+                        }
+                        else polished = checkedResult.Text!;
+                    }
                     formattingTime = formattingTimer.Elapsed;
-                    if (string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
+                    if (!protectedOutput && string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
                     {
                         if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("A shortcut key was held during insertion.");
@@ -324,16 +349,11 @@ public partial class MainWindow : Window
                     }
                     if (direct) currentWordTimer.Complete();
                     directComplete = direct;
-                    polishedText = direct ? polished : polished.Trim();
-                    if (guardedQuestion && !DictationGuard.IsConsistent(corrected, polishedText))
+                    if (!protectedOutput)
                     {
-                        // The text was buffered, so no answer has been inserted or saved.
-                        protectedOutput = true;
-                        polishedText = null;
-                        formattingError = "Formatter output rejected; dictated text preserved";
-                        recoverableText = DictationGuard.SafeText(corrected);
+                        polishedText = direct ? polished : polished.Trim();
+                        recoverableText = polishedText;
                     }
-                    else recoverableText = polishedText;
                 }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { throw; }
                 catch (Exception ex)
@@ -409,12 +429,21 @@ public partial class MainWindow : Window
             for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
             if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
-            Native.TypeTextBatch(recoverableText + (structured ? "" : " "), target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
+            string insertedText = recoverableText + (structured ? "" : " ");
+            CorrectionReader.Snapshot? learningSnapshot = null;
+            var learningTarget = Native.CaptureForeground();
+            if (preferences.LearnCorrections && !isSnippet && !protectedOutput && formattingError == null && settingsTargetElement == null && settings?.IsVisible != true && learningTarget.Window == target && insertedText.Length <= 160)
+            {
+                try { learningSnapshot = await CorrectionReader.TryAsync(() => CorrectionReader.Before(learningTarget.Window, learningTarget.ProcessId)).WaitAsync(TimeSpan.FromMilliseconds(150), lifetime.Token); }
+                catch (TimeoutException) { }
+            }
+            Native.TypeTextBatch(insertedText, target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
+            if (learningSnapshot != null) _ = ObserveCorrectionAsync(learningTarget, learningSnapshot, insertedText, learningGeneration, lifetime.Token);
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
             StatusSounds.Play(preferences.StatusSounds, 900);
-            if (protectedOutput) SetStatus("Dictation preserved", "A possible answer was rejected");
+            if (protectedOutput) SetStatus("Dictation preserved", "Formatter output was rejected");
             else if (formattingError != null) SetStatus(preferences.UsePersonalization ? "Personalized text inserted" : "Raw transcript inserted", usedFallback ? $"{formattingError} · {ModelLabel(formattingModel)} failed" : $"{formattingError} · formatting failed");
             else if (isSnippet) SetStatus("Snippet inserted", "AI formatting skipped");
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
@@ -442,6 +471,28 @@ public partial class MainWindow : Window
             SettingsTargetGuard.Validate(settingsTargetElement, Keyboard.FocusedElement, settings?.IsVisible == true, settings?.IsActive == true);
     }
 
+    private async Task ObserveCorrectionAsync((IntPtr Window, uint ProcessId) captured, CorrectionReader.Snapshot snapshot, string inserted, int generation, CancellationToken token)
+    {
+        try
+        {
+            // Confirm that the exact inserted text is present before considering any later edit.
+            await Task.Delay(TimeSpan.FromSeconds(1), token);
+            string? initial = await CorrectionReader.TryAsync(() => CorrectionReader.After(captured.Window, captured.ProcessId, snapshot)).WaitAsync(TimeSpan.FromSeconds(1), token);
+            if (initial != inserted || generation != learningGeneration) return;
+            await Task.Delay(TimeSpan.FromSeconds(24), token);
+            string? edited = await CorrectionReader.TryAsync(() => CorrectionReader.After(captured.Window, captured.ProcessId, snapshot)).WaitAsync(TimeSpan.FromSeconds(1), token);
+            if (generation != learningGeneration || settings?.IsVisible == true || !Preferences.Load().LearnCorrections || edited == null) return;
+            string? candidate = CorrectionLearning.Candidate(inserted, edited);
+            if (candidate == null) return;
+            var data = PersonalizationStore.Load();
+            string next = CorrectionLearning.Add(data.LearnedWords, candidate);
+            if (next == data.LearnedWords) return;
+            data.LearnedWords = next;
+            PersonalizationStore.Save(data);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch { /* Learning is best effort and must not interrupt dictation. */ }
+    }
     private static string ModelLabel(string model) => model == FormatterRouter.LastResort ? "Backup formatter" : model == FormatterRouter.Fallback ? "GPT-OSS 120B" : "GPT-OSS 20B";
     private void SetCompletionStatus(FirstWordTimer? timer, string model, bool usedFallback)
     {
@@ -482,6 +533,7 @@ public partial class MainWindow : Window
     {
         if (recorder != null || busy) { ShowPill(); SetStatus("Finish dictation first", "Press shortcut to stop recording"); return; }
         if (settings?.IsVisible == true) { settings.Activate(); return; }
+        learningGeneration++;
         idleHideTimer.Stop();
         settings = new SettingsWindow();
         settings.CanCaptureShortcut = () => !busy && recorder == null && !holdSession;

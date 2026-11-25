@@ -26,3 +26,7 @@ Use harmless, non-sensitive text. Run the same transcripts on the primary and fa
 ## Smart routing evaluation
 
 Compare smart routing with 20B-first on the same non-sensitive transcripts. Include short corrections, long ordinary speech, mixed languages, repetitions, no/like/instead as ordinary words and corrections not covered by the English cue list. Check the comparison's selected model and reason, correction accuracy, false switches, median/p95 latency and token costs. The configured threshold and cue list are heuristics, not a confidence score; untested model-quality improvements must not be assumed.
+
+## Fidelity retry evaluation
+
+For buffered output, compare the complete pipeline with and without the local fidelity check on the same transcripts. Include questions with an appended answer, hallucinated expansions, negation, numbers, names, accented speech, genuine repetition, self-corrections, concise and structured modes, and multiple languages. Record false flags and missed errors as well as retry frequency, API cost and end-to-end median/p95 latency. The checks are heuristics, not semantic verification; direct streaming of unrecognized content cannot be checked before insertion. Automated mock tests do not establish a live accuracy improvement.

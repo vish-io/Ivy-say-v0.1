@@ -42,6 +42,11 @@ internal static class Program
                 tabs.SelectedIndex = 1;
                 window.UpdateLayout();
                 Check(window, "My words");
+                if (((CheckBox)window.FindName("LearnCorrections")).IsChecked != false) throw new Exception("Correction learning must be opt-in");
+                var profile = new PersonalizationData { Vocabulary = "manual", LearnedWords = "Prabhjot", Corrections = "", Snippets = "" };
+                PersonalizationStore.Save(profile);
+                if (PersonalizationStore.Load().LearnedWords != "Prabhjot") throw new Exception("Learned words did not round-trip");
+                PersonalizationStore.Delete();
                 var vocabulary = (TextBox)window.FindName("Vocabulary");
                 vocabulary.ApplyTemplate();
                 if (vocabulary.Template.FindName("PART_ContentHost", vocabulary) == null || vocabulary.Template.FindName("Shine", vocabulary) == null) throw new Exception("Text field template missing content host or glow");

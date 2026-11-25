@@ -6,6 +6,7 @@ namespace IvySay;
 internal sealed class PersonalizationData
 {
     public string Vocabulary { get; set; } = "";
+    public string LearnedWords { get; set; } = "";
     public string Corrections { get; set; } = "";
     public string Snippets { get; set; } = "";
 }
@@ -14,7 +15,7 @@ internal static class PersonalizationStore
     private static readonly string DirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay");
     private static readonly string FilePath = Path.Combine(DirectoryPath, "personalization.dat");
     private static PersonalizationData? cached;
-    private static PersonalizationData Copy(PersonalizationData data) => new() { Vocabulary = data.Vocabulary, Corrections = data.Corrections, Snippets = data.Snippets };
+    private static PersonalizationData Copy(PersonalizationData data) => new() { Vocabulary = data.Vocabulary, LearnedWords = data.LearnedWords, Corrections = data.Corrections, Snippets = data.Snippets };
     public static PersonalizationData Load()
     {
         if (cached != null) return Copy(cached);
@@ -23,7 +24,7 @@ internal static class PersonalizationStore
         try
         {
             var data = JsonSerializer.Deserialize<PersonalizationData>(plain) ?? throw new InvalidDataException();
-            if (data.Vocabulary is null || data.Corrections is null || data.Vocabulary.Length > 1000 || data.Corrections.Length > 4500 || data.Snippets is null || data.Snippets.Length > 10000) throw new InvalidDataException();
+            if (data.Vocabulary is null || data.LearnedWords is null || data.LearnedWords.Length > 1000 || data.Corrections is null || data.Vocabulary.Length > 1000 || data.Corrections.Length > 4500 || data.Snippets is null || data.Snippets.Length > 10000) throw new InvalidDataException();
             PersonalizationRules.Parse(data.Corrections);
             SnippetRules.Parse(data.Snippets);
             cached = Copy(data);
@@ -33,8 +34,9 @@ internal static class PersonalizationStore
     }
     public static void Save(PersonalizationData data)
     {
-        if (data.Vocabulary.Length > 1000 || data.Corrections.Length > 4500 || data.Snippets.Length > 10000) throw new ArgumentException("Personalization is too long.");
+        if (data.Vocabulary.Length > 1000 || data.LearnedWords.Length > 1000 || data.Corrections.Length > 4500 || data.Snippets.Length > 10000) throw new ArgumentException("Personalization is too long.");
         if (data.Vocabulary.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t'))) throw new ArgumentException("Vocabulary contains unsupported characters.");
+        if (data.LearnedWords.Any(c => char.IsControl(c) && c is not ('\r' or '\n'))) throw new ArgumentException("Learned words contain unsupported characters.");
         PersonalizationRules.Parse(data.Corrections);
         SnippetRules.Parse(data.Snippets);
         byte[] plain = JsonSerializer.SerializeToUtf8Bytes(data);
