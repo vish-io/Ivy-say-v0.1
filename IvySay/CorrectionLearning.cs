@@ -6,6 +6,7 @@ namespace IvySay;
 internal static class CorrectionLearning
 {
     private static readonly Regex Word = new(@"^[\p{L}\p{M}]{4,32}$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+    private static readonly HashSet<string> CalendarWords = new(StringComparer.OrdinalIgnoreCase) { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" };
     private static readonly Regex Tokens = new(@"[\p{L}\p{M}]+|[^\p{L}\p{M}]+", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     public static string? Candidate(string inserted, string edited)
     {
@@ -17,7 +18,7 @@ internal static class CorrectionLearning
         for (int i = 0; i < a.Length; i++)
         {
             if (a[i] == b[i]) continue;
-            if (candidate != null || !Word.IsMatch(a[i]) || !Word.IsMatch(b[i]) ||
+            if (candidate != null || !Word.IsMatch(a[i]) || !Word.IsMatch(b[i]) || CalendarWords.Contains(a[i]) || CalendarWords.Contains(b[i]) ||
                 string.Equals(a[i], b[i], StringComparison.OrdinalIgnoreCase) || Distance(a[i], b[i]) > 2) return null;
             candidate = b[i];
         }
