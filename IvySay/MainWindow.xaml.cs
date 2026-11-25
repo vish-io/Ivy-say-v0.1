@@ -204,11 +204,11 @@ public partial class MainWindow : Window
                 }
                 string keySnapshot = KeyStore.Load();
                 recordingKey = keySnapshot;
-                var personal = (settingsSnapshot.UsePersonalization || settingsSnapshot.UseSnippets || settingsSnapshot.LearnCorrections) ? PersonalizationStore.Load() : new PersonalizationData();
+                var personal = (settingsSnapshot.UsePersonalization || settingsSnapshot.UseSnippets || settingsSnapshot.LearnCorrections || settingsSnapshot.LearnAppStyles) ? PersonalizationStore.Load() : new PersonalizationData();
                 string vocabulary = string.Join("\n", new[] { settingsSnapshot.UsePersonalization ? personal.Vocabulary : "", settingsSnapshot.LearnCorrections ? personal.LearnedWords : "" }.Where(x => x.Length > 0));
                 string hints = vocabulary.Length > 0 ? PersonalizationRules.BuildPrompt(vocabulary, settingsSnapshot.SpellingHints) : settingsSnapshot.SpellingHints;
                 recordingPreferences = settingsSnapshot;
-                recordingAppName = settingsSnapshot.UseAppContext && settingsSnapshot.Polish && captured.ProcessId != 0
+                recordingAppName = (settingsSnapshot.UseAppContext || settingsSnapshot.LearnAppStyles) && settingsSnapshot.Polish && captured.ProcessId != 0
                     ? Task.Run(() => Native.ResolveProcessName(captured)) : null;
                 recordingPersonal = personal;
                 recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
@@ -291,12 +291,14 @@ public partial class MainWindow : Window
                         if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
                     }
                     // Never wait for context lookup: omission is preferable to delaying dictation.
-                    string? appName = recordingAppName is { IsCompletedSuccessfully: true } ? recordingAppName.Result : null;
+                    string? appKey = recordingAppName is { IsCompletedSuccessfully: true } ? recordingAppName.Result : null;
+                    string? appName = preferences.UseAppContext ? appKey : null;
+                    string? appStyle = preferences.LearnAppStyles ? AppStyleProfiles.Hint(personal.AppStyles, appKey, corrected, preferences.FormattingMode) : null;
                     var formattingTimer = Stopwatch.StartNew();
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
-                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, formatterVocabulary, preferences.FormattingMode),
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, formatterVocabulary, preferences.FormattingMode, appStyle: appStyle),
                         fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -330,7 +332,7 @@ public partial class MainWindow : Window
                             {
                                 firstDeltaTime ??= formattingTimer.Elapsed;
                                 return Task.CompletedTask;
-                            }, token, appName, formatterVocabulary, preferences.FormattingMode, strict: true);
+                            }, token, appName, formatterVocabulary, preferences.FormattingMode, strict: true, appStyle: appStyle);
                         }, lifetime.Token);
                         if (checkedResult.Rejected)
                         {
@@ -432,13 +434,15 @@ public partial class MainWindow : Window
             string insertedText = recoverableText + (structured ? "" : " ");
             CorrectionReader.Snapshot? learningSnapshot = null;
             var learningTarget = Native.CaptureForeground();
-            if (preferences.LearnCorrections && !isSnippet && !protectedOutput && formattingError == null && settingsTargetElement == null && settings?.IsVisible != true && learningTarget.Window == target && insertedText.Length <= 160)
+            string? learningApp = recordingAppName is { IsCompletedSuccessfully: true } ? recordingAppName.Result : null;
+            bool learnStyle = preferences.LearnAppStyles && preferences.Polish && learningApp != null && AppStyleProfiles.Eligible(corrected, preferences.FormattingMode);
+            if ((preferences.LearnCorrections || learnStyle) && !isSnippet && !protectedOutput && formattingError == null && settingsTargetElement == null && settings?.IsVisible != true && learningTarget.Window == target && insertedText.Length <= 160)
             {
                 try { learningSnapshot = await CorrectionReader.TryAsync(() => CorrectionReader.Before(learningTarget.Window, learningTarget.ProcessId)).WaitAsync(TimeSpan.FromMilliseconds(150), lifetime.Token); }
                 catch (TimeoutException) { }
             }
             Native.TypeTextBatch(insertedText, target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
-            if (learningSnapshot != null) _ = ObserveCorrectionAsync(learningTarget, learningSnapshot, insertedText, learningGeneration, lifetime.Token);
+            if (learningSnapshot != null) _ = ObserveCorrectionAsync(learningTarget, learningSnapshot, insertedText, learningGeneration, preferences.LearnCorrections, learnStyle ? learningApp : null, lifetime.Token);
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             recoverableText = null;
@@ -471,7 +475,7 @@ public partial class MainWindow : Window
             SettingsTargetGuard.Validate(settingsTargetElement, Keyboard.FocusedElement, settings?.IsVisible == true, settings?.IsActive == true);
     }
 
-    private async Task ObserveCorrectionAsync((IntPtr Window, uint ProcessId) captured, CorrectionReader.Snapshot snapshot, string inserted, int generation, CancellationToken token)
+    private async Task ObserveCorrectionAsync((IntPtr Window, uint ProcessId) captured, CorrectionReader.Snapshot snapshot, string inserted, int generation, bool learnWords, string? app, CancellationToken token)
     {
         try
         {
@@ -481,14 +485,22 @@ public partial class MainWindow : Window
             if (initial != inserted || generation != learningGeneration) return;
             await Task.Delay(TimeSpan.FromSeconds(24), token);
             string? edited = await CorrectionReader.TryAsync(() => CorrectionReader.After(captured.Window, captured.ProcessId, snapshot)).WaitAsync(TimeSpan.FromSeconds(1), token);
-            if (generation != learningGeneration || settings?.IsVisible == true || !Preferences.Load().LearnCorrections || edited == null) return;
-            string? candidate = CorrectionLearning.Candidate(inserted, edited);
-            if (candidate == null) return;
+            if (generation != learningGeneration || settings?.IsVisible == true || edited == null) return;
+            var current = Preferences.Load();
+            bool useWords = learnWords && current.LearnCorrections;
+            bool useStyle = app != null && current.LearnAppStyles;
+            if (!useWords && !useStyle) return;
             var data = PersonalizationStore.Load();
-            string next = CorrectionLearning.Add(data.LearnedWords, candidate);
-            if (next == data.LearnedWords) return;
-            data.LearnedWords = next;
-            PersonalizationStore.Save(data);
+            bool changed = false;
+            string? candidate = useWords ? CorrectionLearning.Candidate(inserted, edited) : null;
+            if (candidate != null)
+            {
+                string next = CorrectionLearning.Add(data.LearnedWords, candidate);
+                changed = next != data.LearnedWords;
+                data.LearnedWords = next;
+            }
+            if (useStyle) changed |= AppStyleProfiles.Observe(data.AppStyles, app, inserted, edited);
+            if (changed) PersonalizationStore.Save(data);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch { /* Learning is best effort and must not interrupt dictation. */ }
