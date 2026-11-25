@@ -15,7 +15,16 @@ jobs:
           dotnet-version: 8.0.x
       - run: dotnet restore IvySay/IvySay.csproj
       - run: dotnet build IvySay/IvySay.csproj -c Release --no-restore
-      - run: dotnet test IvySay.Tests/IvySay.Tests.csproj -c Release
+      - name: Run unit tests
+        shell: pwsh
+        run: |
+          dotnet test IvySay.Tests/IvySay.Tests.csproj -c Release *> test-output.log
+          $result = $LASTEXITCODE
+          Get-Content test-output.log | ForEach-Object { Write-Output $_ }
+          if ($result -ne 0) {
+            Get-Content test-output.log | Where-Object { $_ -match 'error|Failed|Expected:|Actual:' } | ForEach-Object { Write-Output "::error::$_" }
+            exit $result
+          }
       - name: Smoke test Settings window on Windows
         shell: pwsh
         run: |
