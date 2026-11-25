@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private PersonalizationData? recordingPersonal;
     private string? recordingKey;
     private Task<string?>? recordingAppName;
+    private Task<NearbyContextReader.Snapshot?>? recordingNearby;
     private IInputElement? settingsTargetElement;
     private readonly DispatcherTimer chunkTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private IntPtr target;
@@ -211,6 +212,9 @@ public partial class MainWindow : Window
                 recordingAppName = (settingsSnapshot.UseAppContext || settingsSnapshot.LearnAppStyles) && settingsSnapshot.Polish && captured.ProcessId != 0
                     ? Task.Run(() => Native.ResolveProcessName(captured)) : null;
                 recordingPersonal = personal;
+                IntPtr contextControl = targetControl;
+                recordingNearby = settingsSnapshot.UseNearbyText && settingsSnapshot.Polish && !quickNote && settingsTargetElement == null && captured.ProcessId != 0 && targetControl != IntPtr.Zero
+                    ? CorrectionReader.TryAsync(() => NearbyContextReader.Read(captured, contextControl)) : null;
                 recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
                 chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
                     (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, keySnapshot, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
@@ -230,7 +234,7 @@ public partial class MainWindow : Window
                 StatusSounds.Play(settingsSnapshot.StatusSounds, 680);
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250); recordingQuickNote = false; recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
+            catch (Exception ex) { StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250); recordingQuickNote = false; recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
             finally { busy = false; if (recorder == null) ScheduleIdleHide(); }
             return;
         }
@@ -246,6 +250,11 @@ public partial class MainWindow : Window
         try
         {
             SetStatus("Thinking…", "Transcribing your voice");
+            var nearbyTarget = Native.CaptureForeground();
+            var nearbyControl = targetControl;
+            var capturedNearby = recordingNearby is { IsCompletedSuccessfully: true } ? recordingNearby.Result : null;
+            Task<string?>? verifiedNearby = capturedNearby != null && nearbyTarget.Window == target
+                ? CorrectionReader.TryAsync(() => NearbyContextReader.Verify(nearbyTarget, nearbyControl, capturedNearby)) : null;
             byte[] wav = await current.StopAsync();
             // Audio is 16 kHz, mono, 16-bit PCM with a 44-byte WAV header.
             TimeSpan recordingDuration = TimeSpan.FromSeconds((wav.Length - 44) / 32000d);
@@ -270,6 +279,8 @@ public partial class MainWindow : Window
             recoverableText = isSnippet ? expansion! : corrected;
             bool structured = System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\s*(code|bullet|bullets)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
             if (isSnippet || (preferences.Polish && preferences.FormattingMode == "structured")) structured = true; // Preserve the exact saved expansion.
+            string? nearby = preferences.UseNearbyText && verifiedNearby is { IsCompletedSuccessfully: true } && Native.GetForegroundWindow() == target && Native.FocusedControl(target) == targetControl ? verifiedNearby.Result : null;
+            string? sharedNearby = NearbyContext.ForSharing(preferences.UseNearbyText, preferences.ShareNearbyText, nearby);
             bool guardedQuestion = DictationGuard.RequiresGuard(corrected);
             bool protectedOutput = false;
             bool directComplete = false;
@@ -280,7 +291,7 @@ public partial class MainWindow : Window
             if (preferences.Polish && !isSnippet)
             {
                 SetStatus("Thinking…", "Polishing your words");
-                bool direct = preferences.StreamDirect && allowUnsafeCopy && !recordingQuickNote && !guardedQuestion;
+                bool direct = NearbyContext.CanStreamDirect(preferences.StreamDirect, allowUnsafeCopy, recordingQuickNote, guardedQuestion, sharedNearby);
                 bool directAttempted = false;
                 var streamed = new StringBuilder();
                 try
@@ -298,7 +309,7 @@ public partial class MainWindow : Window
                     var currentWordTimer = new FirstWordTimer(() => formattingTimer.Elapsed);
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
-                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, formatterVocabulary, preferences.FormattingMode, appStyle: appStyle),
+                        (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, formatterVocabulary, preferences.FormattingMode, appStyle: appStyle, nearby: sharedNearby),
                         fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
@@ -332,7 +343,7 @@ public partial class MainWindow : Window
                             {
                                 firstDeltaTime ??= formattingTimer.Elapsed;
                                 return Task.CompletedTask;
-                            }, token, appName, formatterVocabulary, preferences.FormattingMode, strict: true, appStyle: appStyle);
+                            }, token, appName, formatterVocabulary, preferences.FormattingMode, strict: true, appStyle: appStyle, nearby: sharedNearby);
                         }, lifetime.Token);
                         if (checkedResult.Rejected)
                         {
@@ -354,6 +365,7 @@ public partial class MainWindow : Window
                     if (!protectedOutput)
                     {
                         polishedText = direct ? polished : polished.Trim();
+                        if (!direct && !structured && nearby != null) polishedText = NearbyContext.ApplyCase(polishedText, nearby);
                         recoverableText = polishedText;
                     }
                 }
@@ -466,7 +478,7 @@ public partial class MainWindow : Window
             }
             else ShowError(ex, stage);
         }
-        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingQuickNote = false; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; recordingQuickNote = false; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
     }
 
     private void ValidateSettingsTarget()

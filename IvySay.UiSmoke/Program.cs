@@ -68,6 +68,7 @@ internal static class Program
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();
                 Check(window, "Advanced");
+                if (((CheckBox)window.FindName("UseNearbyText")).IsChecked != false || ((CheckBox)window.FindName("ShareNearbyText")).IsChecked != false) throw new Exception("Nearby context must be opt-in");
                 if (((ComboBox)window.FindName("Model")).SelectedIndex != 1 || ((ComboBox)window.FindName("Compression")).SelectedIndex != 1 || ((TextBox)window.FindName("FormatterWordThreshold")).Text != "40" || ((CheckBox)window.FindName("UseAppContext")).IsChecked != true || ((CheckBox)window.FindName("StatusSounds")).IsChecked != true || window.FindName("WarmConnection") != null) throw new Exception("New installation advanced defaults are incorrect");
                 CheckOrb();
                 CheckHoldEvents();

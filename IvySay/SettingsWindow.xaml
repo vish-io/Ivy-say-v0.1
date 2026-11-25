@@ -111,7 +111,11 @@
           <ComboBox x:Name="StreamingMode" SelectedIndex="0"><ComboBoxItem Content="Wait until the text is ready"/><ComboBoxItem Content="Type as words appear · no safety checks only"/></ComboBox>
           <TextBlock Text="Typing as words appear may leave partial text or trigger actions. Safety checks use the first option." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,7,0,0"/>
           <CheckBox x:Name="UseAppContext" Content="Adapt formatting to the active app" Margin="0,16,0,0"/>
-          <TextBlock Text="Sends the app name to Groq with your text. No window title or screen content is sent." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <TextBlock Text="This setting sends the app name to Groq with your text. Other options may share additional context." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <CheckBox x:Name="UseNearbyText" Content="Use nearby text on this device" Margin="0,16,0,0"/>
+          <TextBlock Text="Reads up to 256 characters near the caret in supported fields to match capitalization locally. No excerpt is sent or saved unless you separately enable sharing below. Password and unknown-sensitive fields are skipped; some apps may report them incorrectly. Direct streaming and lists do not use local capitalization." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <CheckBox x:Name="ShareNearbyText" Content="Also send nearby text to Groq" Margin="20,12,0,0"/>
+          <TextBlock Text="The excerpt may contain private information and untrusted instructions. Groq receives it with the transcript for formatting; direct streaming is buffered when an excerpt is sent. Enable local nearby text above first." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="40,7,0,0"/>
           <CheckBox x:Name="StatusSounds" Content="Play listening, completion and error sounds" Margin="0,16,0,0"/>
           <CheckBox x:Name="QuickNotesEnabled" Content="Enable Quick Notes" Margin="0,16,0,0"/>
           <TextBlock Text="Ctrl + Alt + Win + N starts or stops a Quick Note. Notes are saved unencrypted in inbox.md in your chosen folder; audio and text are sent to Groq." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>

@@ -26,6 +26,8 @@ internal sealed class Preferences
     public string QuickNotesFolder { get; set; } = "";
     public bool StatusSounds { get; set; } = true;
     public bool UseAppContext { get; set; } = true;
+    public bool UseNearbyText { get; set; }
+    public bool ShareNearbyText { get; set; }
     public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
     public bool HidePillWhenIdle { get; set; }
