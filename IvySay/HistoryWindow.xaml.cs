@@ -12,6 +12,7 @@ public partial class HistoryWindow : Window
     private WaveFileReader? reader;
     private byte[]? playingAudio;
     private bool closed;
+    private int playbackVersion;
     public HistoryWindow()
     {
         InitializeComponent();
@@ -41,10 +42,11 @@ public partial class HistoryWindow : Window
     {
         if (Entries.SelectedItem is not Row selected) return;
         StopPlayback(); Play.IsEnabled = false;
+        int version = playbackVersion;
         try
         {
             var item = await DictationHistory.GetAsync(selected.Entry.Id);
-            if (closed || Entries.SelectedItem != selected || item.Audio == null) { if (item.Audio != null) CryptographicOperations.ZeroMemory(item.Audio); return; }
+            if (closed || version != playbackVersion || !ReferenceEquals(Entries.SelectedItem, selected) || item.Audio == null) { if (item.Audio != null) CryptographicOperations.ZeroMemory(item.Audio); return; }
             playingAudio = item.Audio;
             reader = new WaveFileReader(new MemoryStream(playingAudio, writable: false));
             player = new WaveOutEvent(); player.Init(reader); player.Play();
@@ -53,7 +55,7 @@ public partial class HistoryWindow : Window
         finally { if (!closed) Play.IsEnabled = (Entries.SelectedItem as Row)?.Entry.HasAudio == true; }
     }
     private void StopAudio(object sender, RoutedEventArgs e) => StopPlayback();
-    private void StopPlayback() { player?.Stop(); player?.Dispose(); player = null; reader?.Dispose(); reader = null; if (playingAudio != null) CryptographicOperations.ZeroMemory(playingAudio); playingAudio = null; }
+    private void StopPlayback() { playbackVersion++; player?.Stop(); player?.Dispose(); player = null; reader?.Dispose(); reader = null; if (playingAudio != null) CryptographicOperations.ZeroMemory(playingAudio); playingAudio = null; }
     private async void DeleteSelected(object sender, RoutedEventArgs e)
     {
         if (Entries.SelectedItem is not Row row || IvyDialog.Show("Delete this dictation and its saved audio?", "Ivy Say", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
