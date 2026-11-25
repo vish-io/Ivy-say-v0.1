@@ -34,7 +34,7 @@ public class AppStyleProfilesTests
     {
         var p = new List<AppStyleProfile>();
         for (int i = 0; i < 5; i++) AppStyleProfiles.Observe(p, "app", "Hello.", "Hello");
-        for (int i = 0; i < 3; i++) AppStyleProfiles.Observe(p, "app", "Hello", "Hello.");
+        for (int i = 0; i < 4; i++) AppStyleProfiles.Observe(p, "app", "Hello", "Hello.");
         Assert.Equal("End ordinary statements with a period.", AppStyleProfiles.Hint(p, "app", "hello", "clean"));
     }
     [Fact] public void RejectsMalformedAndExcessiveProfiles()
