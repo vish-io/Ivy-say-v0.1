@@ -116,6 +116,14 @@
           <TextBlock Text="Reads up to 256 characters near the caret in supported fields to match capitalization locally. No excerpt is sent or saved unless you separately enable sharing below. Password and unknown-sensitive fields are skipped; some apps may report them incorrectly. Direct streaming and lists do not use local capitalization." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
           <CheckBox x:Name="ShareNearbyText" Content="Also send nearby text to Groq" Margin="20,12,0,0"/>
           <TextBlock Text="The excerpt may contain private information and untrusted instructions. Groq receives it with the transcript for formatting; direct streaming is buffered when an excerpt is sent. Enable local nearby text above first." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="40,7,0,0"/>
+          <CheckBox x:Name="HistoryEnabled" Content="Save encrypted dictation history" Margin="0,16,0,0"/>
+          <TextBlock Text="Saves the Whisper transcript and inserted text on this Windows account. Successful regular dictations only; password and unknown-sensitive fields are skipped. Other sensitive text may still be saved. No automatic training or history upload." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <CheckBox x:Name="HistoryAudioEnabled" Content="Also save encrypted audio" Margin="20,12,0,0"/>
+          <TextBlock Text="Audio is stored locally with history; enable history first. Playback uses your speakers." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="40,7,0,0"/>
+          <TextBlock Text="Keep saved history for" Style="{StaticResource FieldLabel}" Margin="20,12,0,7"/>
+          <ComboBox x:Name="HistoryDays" SelectedIndex="1"><ComboBoxItem Content="7 days"/><ComboBoxItem Content="30 days"/><ComboBoxItem Content="90 days"/></ComboBox>
+          <TextBlock Text="Up to 100 entries and 64 MB. Older entries are removed when Ivy Say runs. Turning saving off does not erase existing history." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>
+          <Button Content="View or delete saved history" Click="OpenHistory" HorizontalAlignment="Left" Margin="20,10,0,0"/>
           <CheckBox x:Name="StatusSounds" Content="Play listening, completion and error sounds" Margin="0,16,0,0"/>
           <CheckBox x:Name="QuickNotesEnabled" Content="Enable Quick Notes" Margin="0,16,0,0"/>
           <TextBlock Text="Ctrl + Alt + Win + N starts or stops a Quick Note. Notes are saved unencrypted in inbox.md in your chosen folder; audio and text are sent to Groq." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,7,0,0"/>

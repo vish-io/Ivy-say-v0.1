@@ -68,6 +68,9 @@ internal static class Program
                 tabs.SelectedIndex = 2;
                 window.UpdateLayout();
                 Check(window, "Advanced");
+                if (((CheckBox)window.FindName("HistoryEnabled")).IsChecked != false || ((CheckBox)window.FindName("HistoryAudioEnabled")).IsChecked != false) throw new Exception("History must be opt-in");
+                CheckHistoryStorage();
+                var historyWindow = new HistoryWindow(); historyWindow.Show(); historyWindow.UpdateLayout(); historyWindow.Close();
                 if (((CheckBox)window.FindName("UseNearbyText")).IsChecked != false || ((CheckBox)window.FindName("ShareNearbyText")).IsChecked != false) throw new Exception("Nearby context must be opt-in");
                 if (((ComboBox)window.FindName("Model")).SelectedIndex != 1 || ((ComboBox)window.FindName("Compression")).SelectedIndex != 1 || ((TextBox)window.FindName("FormatterWordThreshold")).Text != "40" || ((CheckBox)window.FindName("UseAppContext")).IsChecked != true || ((CheckBox)window.FindName("StatusSounds")).IsChecked != true || window.FindName("WarmConnection") != null) throw new Exception("New installation advanced defaults are incorrect");
                 CheckOrb();
@@ -83,6 +86,40 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckHistoryStorage()
+    {
+        var assembly = typeof(SettingsWindow).Assembly;
+        var prefsType = assembly.GetType("IvySay.Preferences")!;
+        var store = assembly.GetType("IvySay.DictationHistory")!;
+        var prefs = Activator.CreateInstance(prefsType)!;
+        prefsType.GetProperty("HistoryEnabled")!.SetValue(prefs, true);
+        prefsType.GetProperty("HistoryAudioEnabled")!.SetValue(prefs, true);
+        prefsType.GetMethod("Save")!.Invoke(prefs, null);
+        long generation = (long)store.GetProperty("Generation")!.GetValue(null)!;
+        var save = store.GetMethod("RecordAsync")!.Invoke(null, new object[] { "private transcript marker", "private result marker", new byte[44], true, generation })!;
+        ((Task)save).GetAwaiter().GetResult();
+        if (!(bool)save.GetType().GetProperty("Result")!.GetValue(save)!) throw new Exception("History save failed");
+        string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay", "history");
+        var files = System.IO.Directory.GetFiles(dir, "*.dat");
+        if (files.Length != 1 || System.Text.Encoding.UTF8.GetString(System.IO.File.ReadAllBytes(files[0])).Contains("private transcript marker")) throw new Exception("History must be encrypted");
+        var listTask = store.GetMethod("ListAsync")!.Invoke(null, new object[] { 30 })!;
+        ((Task)listTask).GetAwaiter().GetResult();
+        var list = (System.Collections.IList)listTask.GetType().GetProperty("Result")!.GetValue(listTask)!;
+        if (list.Count != 1) throw new Exception("History did not round-trip");
+        var entry = list[0]!;
+        if (!(bool)entry.GetType().GetProperty("HasAudio")!.GetValue(entry)!) throw new Exception("History audio missing");
+        ((Task)store.GetMethod("ClearAudioAsync")!.Invoke(null, null)!).GetAwaiter().GetResult();
+        var read = store.GetMethod("GetAsync")!.Invoke(null, new[] { entry.GetType().GetProperty("Id")!.GetValue(entry)! })!;
+        ((Task)read).GetAwaiter().GetResult();
+        var withoutAudio = read.GetType().GetProperty("Result")!.GetValue(read)!;
+        if (withoutAudio.GetType().GetProperty("Audio")!.GetValue(withoutAudio) != null) throw new Exception("Saved audio not deleted");
+        ((Task)store.GetMethod("ClearAsync")!.Invoke(null, null)!).GetAwaiter().GetResult();
+        if (System.IO.Directory.GetFiles(dir, "*.dat").Length != 0) throw new Exception("History not deleted");
+        var stale = store.GetMethod("RecordAsync")!.Invoke(null, new object[] { "old", "old", new byte[44], false, generation })!;
+        ((Task)stale).GetAwaiter().GetResult();
+        if ((bool)stale.GetType().GetProperty("Result")!.GetValue(stale)!) throw new Exception("A cleared pending record reappeared");
+        prefsType.GetProperty("HistoryEnabled")!.SetValue(prefs, false); prefsType.GetProperty("HistoryAudioEnabled")!.SetValue(prefs, false); prefsType.GetMethod("Save")!.Invoke(prefs, null);
     }
     private static void CheckKineticGrid(KineticGrid grid)
     {

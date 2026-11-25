@@ -5,6 +5,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <Compile Include="../IvySay/HistoryPolicy.cs" Link="HistoryPolicy.cs" />
     <Compile Include="../IvySay/NearbyContext.cs" Link="NearbyContext.cs" />
     <Compile Include="../IvySay/AppStyleProfiles.cs" Link="AppStyleProfiles.cs" />
     <Compile Include="../IvySay/CorrectionLearning.cs" Link="CorrectionLearning.cs" />

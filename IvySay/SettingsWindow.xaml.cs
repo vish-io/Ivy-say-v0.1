@@ -146,6 +146,9 @@ public partial class SettingsWindow : Window
         UseAppContext.IsChecked = preferences.UseAppContext;
         UseNearbyText.IsChecked = preferences.UseNearbyText;
         ShareNearbyText.IsChecked = preferences.ShareNearbyText;
+        HistoryEnabled.IsChecked = preferences.HistoryEnabled;
+        HistoryAudioEnabled.IsChecked = preferences.HistoryAudioEnabled;
+        HistoryDays.SelectedIndex = preferences.HistoryDays switch { 7 => 0, 90 => 2, _ => 1 };
         UsePersonalization.IsChecked = preferences.UsePersonalization;
         LearnCorrections.IsChecked = preferences.LearnCorrections;
         LearnAppStyles.IsChecked = preferences.LearnAppStyles;
@@ -175,6 +178,9 @@ public partial class SettingsWindow : Window
         try
         {
             var existing = Preferences.Load();
+            if (HistoryAudioEnabled.IsChecked == true && HistoryEnabled.IsChecked != true) { IvyDialog.Show("Enable dictation history before saving audio.", "Ivy Say"); return; }
+            if (HistoryEnabled.IsChecked == true && !existing.HistoryEnabled && IvyDialog.Show("Save future dictated transcripts and inserted text encrypted on this Windows account? Sensitive information may be included. You can delete history later.", "Ivy Say · History", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            if (HistoryAudioEnabled.IsChecked == true && !(existing.HistoryEnabled && existing.HistoryAudioEnabled) && IvyDialog.Show("Also retain future microphone recordings encrypted with history on this device? They can contain sensitive speech. You can delete saved audio separately.", "Ivy Say · Audio history", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             if (ShareNearbyText.IsChecked == true && UseNearbyText.IsChecked != true) { IvyDialog.Show("Enable nearby text on this device before sharing it.", "Ivy Say"); return; }
             if (ShareNearbyText.IsChecked == true && !(existing.ShareNearbyText && existing.UseNearbyText) && IvyDialog.Show("Ivy Say may send up to 256 characters around your cursor to Groq with each dictation. This could include private text. Enable sharing?", "Ivy Say · Nearby text", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             if (QuickNotesEnabled.IsChecked == true && (string.IsNullOrWhiteSpace(QuickNotesFolder.Text) || !System.IO.Directory.Exists(QuickNotesFolder.Text))) { IvyDialog.Show("Choose an existing folder for Quick Notes first.", "Ivy Say"); return; }
@@ -191,8 +197,11 @@ public partial class SettingsWindow : Window
             var oldShortcut = ShortcutBinding.From(existing);
             string? shortcutError = proposed != oldShortcut ? ApplyShortcut?.Invoke(proposed) : null;
             if (shortcutError != null) { IvyDialog.Show(shortcutError, "Ivy Say · Shortcut"); return; }
-            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, LearnCorrections = existing.LearnCorrections, LearnAppStyles = existing.LearnAppStyles, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, UseNearbyText = UseNearbyText.IsChecked == true, ShareNearbyText = ShareNearbyText.IsChecked == true && UseNearbyText.IsChecked == true, Shortcut = existing.Shortcut }.Save(); }
+            DictationHistory.Invalidate();
+            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, LearnCorrections = existing.LearnCorrections, LearnAppStyles = existing.LearnAppStyles, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, UseNearbyText = UseNearbyText.IsChecked == true, ShareNearbyText = ShareNearbyText.IsChecked == true && UseNearbyText.IsChecked == true, HistoryEnabled = HistoryEnabled.IsChecked == true, HistoryAudioEnabled = HistoryAudioEnabled.IsChecked == true && HistoryEnabled.IsChecked == true, HistoryDays = HistoryDays.SelectedIndex switch { 0 => 7, 2 => 90, _ => 30 }, Shortcut = existing.Shortcut }.Save(); }
             catch { if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut); throw; }
+            DictationHistory.Invalidate();
+            _ = CleanupHistoryAsync();
             selectedShortcut = proposed;
             SavedFeedback();
             PreferencesSaved?.Invoke(this, EventArgs.Empty);
@@ -200,6 +209,12 @@ public partial class SettingsWindow : Window
         }
         catch { IvyDialog.Show("Could not save preferences.", "Ivy Say"); }
     }
+    private async Task CleanupHistoryAsync()
+    {
+        try { await DictationHistory.CleanupAsync(Preferences.Load().HistoryDays); }
+        catch { /* Existing history is retained if cleanup fails. */ }
+    }
+    private void OpenHistory(object sender, RoutedEventArgs e) => new HistoryWindow { Owner = this }.Show();
     private void ChooseNotesFolder(object sender, RoutedEventArgs e)
     {
         using var dialog = new System.Windows.Forms.FolderBrowserDialog { Description = "Choose where unencrypted Quick Notes are saved", UseDescriptionForTitle = true };

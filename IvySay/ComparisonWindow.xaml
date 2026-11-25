@@ -9,7 +9,7 @@
     <TextBox x:Name="PersonalText" Grid.Row="5" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10" FontSize="14"/>
     <TextBlock x:Name="OutputLabel" Grid.Row="6" FontWeight="SemiBold" Margin="0,14,0,6"/>
     <TextBox x:Name="OutputText" Grid.Row="7" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10" FontSize="14"/>
-    <TextBlock Grid.Row="8" Text="Testing only: the original captured audio stays in memory until this window is closed; playback uses your speakers. It is not saved by Ivy Say." TextWrapping="Wrap" Foreground="#65746c" Margin="0,12,0,0"/>
+    <TextBlock Grid.Row="8" Text="Playback uses your speakers. This window keeps audio in memory until closed; optional encrypted history can save it if enabled." TextWrapping="Wrap" Foreground="#65746c" Margin="0,12,0,0"/>
     <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,14,0,0">
       <Button Content="Play captured audio" Click="PlayAudio"/>
       <Button Content="Stop playback" Click="StopAudio" Margin="8,0,0,0"/>

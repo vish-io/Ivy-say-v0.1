@@ -21,6 +21,8 @@ public partial class MainWindow : Window
     private string? recordingKey;
     private Task<string?>? recordingAppName;
     private Task<NearbyContextReader.Snapshot?>? recordingNearby;
+    private Task<HistoryFieldSafety.Target?>? recordingHistoryTarget;
+    private long recordingHistoryGeneration;
     private IInputElement? settingsTargetElement;
     private readonly DispatcherTimer chunkTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private IntPtr target;
@@ -43,6 +45,7 @@ public partial class MainWindow : Window
     private NotificationArea? notificationArea;
     private HwndSource? source;
     private readonly DispatcherTimer idleHideTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private readonly DispatcherTimer historyCleanupTimer = new() { Interval = TimeSpan.FromHours(1) };
     private readonly DispatcherTimer recordingTimer = new() { Interval = TimeSpan.FromSeconds(115) };
     public MainWindow()
     {
@@ -53,6 +56,9 @@ public partial class MainWindow : Window
         Top = SystemParameters.WorkArea.Bottom - Height - 32;
         chunkTimer.Tick += (_, _) => { if (recorder != null && recordingPreferences?.EnableChunking == true) chunkSession?.Update(recorder.SnapshotPcm()); };
         recordingTimer.Tick += async (_, _) => { recordingTimer.Stop(); if (recorder != null) await ToggleAsync(); };
+        historyCleanupTimer.Tick += (_, _) => _ = CleanupHistoryAsync();
+        historyCleanupTimer.Start();
+        _ = CleanupHistoryAsync();
         SourceInitialized += OnSourceInitialized;
         idleHideTimer.Tick += (_, _) =>
         {
@@ -60,7 +66,7 @@ public partial class MainWindow : Window
             if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) Hide();
         };
         Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
-        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); if (selectionHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, selectionHotkeyId); if (quickNoteHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, quickNoteHotkeyId); if (modeHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, modeHotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
+        Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); historyCleanupTimer.Stop(); DictationHistory.Invalidate(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); if (selectionHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, selectionHotkeyId); if (quickNoteHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, quickNoteHotkeyId); if (modeHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, modeHotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -215,6 +221,9 @@ public partial class MainWindow : Window
                 IntPtr contextControl = targetControl;
                 recordingNearby = settingsSnapshot.UseNearbyText && settingsSnapshot.Polish && !quickNote && settingsTargetElement == null && captured.ProcessId != 0 && targetControl != IntPtr.Zero
                     ? CorrectionReader.TryAsync(() => NearbyContextReader.Read(captured, contextControl)) : null;
+                recordingHistoryGeneration = DictationHistory.Generation;
+                recordingHistoryTarget = settingsSnapshot.HistoryEnabled && !quickNote && settingsTargetElement == null && captured.ProcessId != 0 && contextControl != IntPtr.Zero
+                    ? HistoryFieldSafety.TryAsync(() => HistoryFieldSafety.Capture(captured, contextControl)) : null;
                 recordingCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
                 chunkSession = new ChunkedTranscription(settingsSnapshot.ChunkThresholdSeconds, settingsSnapshot.CompressionKbps, hints,
                     (audio, opus, prompt, token) => groq.TranscribeAudioAsync(audio, opus, keySnapshot, settingsSnapshot.TranscriptionModel, settingsSnapshot.Language, prompt, token), recordingCancellation.Token);
@@ -234,7 +243,7 @@ public partial class MainWindow : Window
                 StatusSounds.Play(settingsSnapshot.StatusSounds, 680);
             }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception ex) { StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250); recordingQuickNote = false; recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
+            catch (Exception ex) { StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250); recordingQuickNote = false; recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; recordingHistoryTarget = null; settingsTargetElement = null; recorder?.Dispose(); recorder = null; ShowPill(); ShowError(ex, startStage); }
             finally { busy = false; if (recorder == null) ScheduleIdleHide(); }
             return;
         }
@@ -422,6 +431,7 @@ public partial class MainWindow : Window
             if (directComplete)
             {
                 _ = UsageStatistics.Default.RecordAsync(polishedText!, recordingDuration, DateTime.Now);
+                if (preferences.HistoryEnabled && !isSnippet) _ = SaveHistoryAsync(raw, polishedText!, wav, preferences.HistoryAudioEnabled, recordingHistoryTarget, recordingHistoryGeneration, lifetime.Token);
                 recoverableText = null;
                 SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
                 StatusSounds.Play(preferences.StatusSounds, 900);
@@ -457,6 +467,7 @@ public partial class MainWindow : Window
             if (learningSnapshot != null) _ = ObserveCorrectionAsync(learningTarget, learningSnapshot, insertedText, learningGeneration, preferences.LearnCorrections, learnStyle ? learningApp : null, lifetime.Token);
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
+            if (preferences.HistoryEnabled && !isSnippet) _ = SaveHistoryAsync(raw, recoverableText, wav, preferences.HistoryAudioEnabled, recordingHistoryTarget, recordingHistoryGeneration, lifetime.Token);
             recoverableText = null;
             StatusSounds.Play(preferences.StatusSounds, 900);
             if (protectedOutput) SetStatus("Dictation preserved", "Formatter output was rejected");
@@ -478,7 +489,25 @@ public partial class MainWindow : Window
             }
             else ShowError(ex, stage);
         }
-        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; recordingQuickNote = false; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
+        finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; recordingHistoryTarget = null; recordingQuickNote = false; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
+    }
+
+    private static async Task CleanupHistoryAsync()
+    {
+        try { await DictationHistory.CleanupAsync(Preferences.Load().HistoryDays); }
+        catch { /* Retention cleanup is retried later; never interrupt dictation. */ }
+    }
+    private async Task SaveHistoryAsync(string raw, string result, byte[] wav, bool includeAudio, Task<HistoryFieldSafety.Target?>? captured, long generation, CancellationToken token)
+    {
+        try
+        {
+            if (captured is not { IsCompletedSuccessfully: true } || captured.Result == null) return;
+            var target = await HistoryFieldSafety.TryAsync(() => HistoryFieldSafety.Verify(captured.Result)).WaitAsync(TimeSpan.FromSeconds(2), token);
+            if (target == null || token.IsCancellationRequested) return;
+            if (!await DictationHistory.RecordAsync(raw, result, wav, includeAudio, generation) && !token.IsCancellationRequested && recorder == null && !busy)
+                SetStatus("Dictation inserted", "Could not save history");
+        }
+        catch { if (!token.IsCancellationRequested && recorder == null && !busy) SetStatus("Dictation inserted", "Could not save history"); }
     }
 
     private void ValidateSettingsTarget()

@@ -30,6 +30,9 @@ internal sealed class Preferences
     public bool ShareNearbyText { get; set; }
     public bool StreamDirect { get; set; }
     public bool ShowComparison { get; set; }
+    public bool HistoryEnabled { get; set; }
+    public bool HistoryAudioEnabled { get; set; }
+    public int HistoryDays { get; set; } = 30;
     public bool HidePillWhenIdle { get; set; }
     public int CompressionKbps { get; set; } = 24;
     public int ChunkThresholdSeconds { get; set; } = 14;
@@ -64,6 +67,7 @@ internal sealed class Preferences
         if (!root.TryGetProperty(nameof(UseAppContext), out _)) value.UseAppContext = false;
         if (value.TranscriptionModel is not ("whisper-large-v3" or "whisper-large-v3-turbo")) value.TranscriptionModel = "whisper-large-v3";
         value.FormattingMode = FormattingModes.Normalize(value.FormattingMode);
+        value.HistoryDays = HistoryPolicy.Days(value.HistoryDays);
         value.QuickNotesFolder ??= "";
         if (value.Language is not ("auto" or "en" or "hi" or "pa")) value.Language = "auto";
         if (value.SpellingHints is null || value.SpellingHints.Length > 160) value.SpellingHints = "";
