@@ -34,6 +34,8 @@
           <TextBlock Text="Choose a shortcut with a non-modifier key. In hold mode, Ivy Say consumes the chosen key while recording; modifier keys may still affect other apps. Windows may reserve some shortcuts." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,8,0,0"/>
         </StackPanel></Border>
         <Border Style="{StaticResource Card}"><StackPanel>
+          <CheckBox x:Name="StartOnLogin" Content="Start Ivy Say when I sign in to Windows" Margin="0,0,0,8"/>
+          <TextBlock x:Name="StartupStatus" TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,0,0,16"/>
           <CheckBox x:Name="HidePillWhenIdle" Content="Hide the pill when not in use" Margin="0,0,0,8"/>
           <TextBlock Text="Use the Ivy Say icon in the Windows notification area to open Settings or quit." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="20,0,0,20"/>
           <TextBlock Text="Your text" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
@@ -63,6 +65,8 @@
           <TextBlock Text="Learn from corrections" Style="{StaticResource SectionTitle}"/>
           <CheckBox x:Name="LearnCorrections" Content="Learn words from my edits" Margin="0,16,0,0"/>
           <TextBlock Text="When enabled, Ivy Say briefly reads a small area around its recent insertion in supported text fields to detect spelling edits. Learned words are encrypted on this device and may be sent to Groq as hints. Password fields are excluded. This works only for some fields, not direct streaming or Quick Notes." TextWrapping="Wrap" Foreground="#9CA3B5" FontSize="12" Margin="0,10,0,0"/>
+          <TextBlock Text="Latest learning check" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
+          <TextBlock x:Name="LearningStatus" TextWrapping="Wrap" Foreground="#B9CFC6" FontSize="12" LineHeight="18"/>
           <TextBlock Text="Learned words · remove any you don't want" Style="{StaticResource FieldLabel}" Margin="0,16,0,7"/>
           <TextBox x:Name="LearnedWords" AcceptsReturn="True" MaxLength="1000" Height="100" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
           <Button Content="Save learning settings and words" Click="SavePersonalization" HorizontalAlignment="Left" Margin="0,16,0,0"/>

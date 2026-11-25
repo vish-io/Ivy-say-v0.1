@@ -17,6 +17,9 @@
     <Compile Include="../IvySay/SnippetRules.cs" Link="SnippetRules.cs" />
     <Compile Include="../IvySay/AppContextData.cs" Link="AppContextData.cs" />
     <Compile Include="../IvySay/FailureDetails.cs" Link="FailureDetails.cs" />
+    <Compile Include="../IvySay/LearningFeedback.cs" Link="LearningFeedback.cs" />
+    <Compile Include="../IvySay/StartupCommand.cs" Link="StartupCommand.cs" />
+    <Compile Include="../IvySay/ShortcutReleasePolicy.cs" Link="ShortcutReleasePolicy.cs" />
     <Compile Include="../IvySay/ShortcutBinding.cs" Link="ShortcutBinding.cs" />
     <Compile Include="../IvySay/PillVisibilityPolicy.cs" Link="PillVisibilityPolicy.cs" />
     <Compile Include="../IvySay/SettingsTargetGuard.cs" Link="SettingsTargetGuard.cs" />

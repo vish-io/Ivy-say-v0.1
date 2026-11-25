@@ -34,6 +34,7 @@ internal sealed class Preferences
     public bool HistoryAudioEnabled { get; set; }
     public int HistoryDays { get; set; } = 30;
     public bool HidePillWhenIdle { get; set; }
+    public bool StartOnLogin { get; set; } = true;
     public int CompressionKbps { get; set; } = 24;
     public int ChunkThresholdSeconds { get; set; } = 14;
     public bool EnableChunking { get; set; } = true;
@@ -41,14 +42,19 @@ internal sealed class Preferences
     public int FormatterWordThreshold { get; set; } = 40;
     public bool Polish { get; set; } = true;
     private static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IvySay", "preferences.json");
-    public static Preferences Load()
+    public static Preferences Load() { TryLoad(out var preferences); return preferences; }
+    public static bool TryLoad(out Preferences preferences)
     {
         try
         {
-            if (!File.Exists(FilePath)) return new Preferences();
-            return ParseExisting(File.ReadAllText(FilePath));
+            preferences = !File.Exists(FilePath) ? new Preferences() : ParseExisting(File.ReadAllText(FilePath));
+            return true;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return new Preferences { SecurityLevel = "Guarded" }; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            preferences = new Preferences { SecurityLevel = "Guarded", StartOnLogin = false };
+            return false;
+        }
     }
     internal static Preferences ParseExisting(string json)
     {

@@ -24,6 +24,8 @@ internal static class Program
             try
             {
                 Check(window, "General");
+                if (((CheckBox)window.FindName("StartOnLogin")).IsChecked != true) throw new Exception("Startup should be enabled by default");
+                CheckStartupRegistration();
                 if (((ComboBox)window.FindName("SpokenLanguage")).SelectedIndex != 1 || ((ComboBox)window.FindName("SecurityLevel")).SelectedIndex != 0 || ((CheckBox)window.FindName("Polish")).IsChecked != true) throw new Exception("New installation general defaults are incorrect");
                 if (AppCursors.Arrow == System.Windows.Input.Cursors.Arrow || AppCursors.Hand == System.Windows.Input.Cursors.Hand)
                     throw new Exception("Custom cursor resource failed to load");
@@ -42,6 +44,7 @@ internal static class Program
                 tabs.SelectedIndex = 1;
                 window.UpdateLayout();
                 Check(window, "My words");
+                if (((TextBlock)window.FindName("LearningStatus")).Text.Length == 0) throw new Exception("Learning feedback missing");
                 if (((CheckBox)window.FindName("LearnCorrections")).IsChecked != false || ((CheckBox)window.FindName("LearnAppStyles")).IsChecked != false) throw new Exception("Correction learning must be opt-in");
                 var assembly = typeof(SettingsWindow).Assembly;
                 var dataType = assembly.GetType("IvySay.PersonalizationData")!;
@@ -70,6 +73,10 @@ internal static class Program
                 Check(window, "Advanced");
                 if (((CheckBox)window.FindName("HistoryEnabled")).IsChecked != false || ((CheckBox)window.FindName("HistoryAudioEnabled")).IsChecked != false) throw new Exception("History must be opt-in");
                 CheckHistoryStorage();
+                var recovery = new RecoveryWindow("sample", "Test"); recovery.Show(); recovery.UpdateLayout();
+                var recoveryText = (TextBox)recovery.FindName("ResultText"); recoveryText.ApplyTemplate();
+                if (recovery.WindowStyle != WindowStyle.None || recoveryText.Template.FindName("Shine", recoveryText) == null) throw new Exception("Recovery styling missing");
+                recovery.Close();
                 var historyWindow = new HistoryWindow(); historyWindow.Show(); historyWindow.UpdateLayout(); historyWindow.Close();
                 if (((CheckBox)window.FindName("UseNearbyText")).IsChecked != false || ((CheckBox)window.FindName("ShareNearbyText")).IsChecked != false) throw new Exception("Nearby context must be opt-in");
                 if (((ComboBox)window.FindName("Model")).SelectedIndex != 1 || ((ComboBox)window.FindName("Compression")).SelectedIndex != 1 || ((TextBox)window.FindName("FormatterWordThreshold")).Text != "40" || ((CheckBox)window.FindName("UseAppContext")).IsChecked != true || ((CheckBox)window.FindName("StatusSounds")).IsChecked != true || window.FindName("WarmConnection") != null) throw new Exception("New installation advanced defaults are incorrect");
@@ -86,6 +93,32 @@ internal static class Program
         timer.Start();
         Dispatcher.Run();
         return result;
+    }
+    private static void CheckStartupRegistration()
+    {
+        var type = typeof(SettingsWindow).Assembly.GetType("IvySay.StartupRegistration")!;
+        string subkey = @"Software\IvySaySmokeTests\" + Guid.NewGuid().ToString("N");
+        string temp = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "startup-smoke");
+        System.IO.Directory.CreateDirectory(temp);
+        string app = System.IO.Path.Combine(temp, "IvySay.exe");
+        System.IO.File.WriteAllText(app, "test file");
+        try
+        {
+            using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(subkey, true)) key.SetValue("IvySay", "original");
+            var old = type.GetMethod("Read")!.Invoke(null, new object[] { subkey })!;
+            type.GetMethod("Set")!.Invoke(null, new object?[] { true, app, subkey });
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(subkey))
+                if ((string?)key!.GetValue("IvySay") != "\"" + app + "\" --startup") throw new Exception("Incorrect startup command");
+            type.GetMethod("Restore")!.Invoke(null, new object[] { old, subkey });
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(subkey))
+                if ((string?)key!.GetValue("IvySay") != "original") throw new Exception("Startup rollback failed");
+            type.GetMethod("Set")!.Invoke(null, new object?[] { false, null, subkey });
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(subkey))
+                if (key!.GetValue("IvySay") != null) throw new Exception("Startup disabling failed");
+            try { type.GetMethod("Set")!.Invoke(null, new object?[] { true, System.IO.Path.Combine(temp, "dotnet.exe"), subkey }); throw new Exception("Invalid startup executable accepted"); }
+            catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is InvalidOperationException) { }
+        }
+        finally { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(subkey, false); System.IO.Directory.Delete(temp, true); }
     }
     private static void CheckHistoryStorage()
     {
@@ -159,11 +192,29 @@ internal static class Program
             for (int i = 0; i < 32; i++) System.Runtime.InteropServices.Marshal.WriteByte(data, i, 0);
             System.Runtime.InteropServices.Marshal.WriteInt32(data, 0, 0x78);
             IntPtr Fire(int message) => (IntPtr)onKey.Invoke(hook, new object[] { 0, new IntPtr(message), data })!;
-            if (Fire(0x100) != new IntPtr(1) || Fire(0x100) != new IntPtr(1) || Fire(0x101) != new IntPtr(1) || starts != 1 || stops != 1)
+            var held = hookType.GetProperty("TriggerHeld")!;
+            if (Fire(0x100) != new IntPtr(1) || !(bool)held.GetValue(hook)! || Fire(0x100) != new IntPtr(1) || Fire(0x101) != new IntPtr(1) || (bool)held.GetValue(hook)! || starts != 1 || stops != 1)
                 throw new Exception("Hold trigger repeat/release handling failed");
             System.Runtime.InteropServices.Marshal.WriteInt32(data, 8, 0x10);
             Fire(0x100); Fire(0x101);
             if (starts != 1 || stops != 1) throw new Exception("Injected input triggered hold-to-speak");
+        }
+        finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(data); }
+        object modifiedBinding = Activator.CreateInstance(bindingType, 0x78, 2u, true)!;
+        int released = 0;
+        using var second = (IDisposable)Activator.CreateInstance(hookType, modifiedBinding, new Func<bool>(() => true), new Action(() => { }), new Action(() => released++))!;
+        hookType.GetField("down", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(second, true);
+        hookType.GetField("suppressTrigger", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(second, true);
+        data = System.Runtime.InteropServices.Marshal.AllocHGlobal(32);
+        try
+        {
+            for (int i = 0; i < 32; i++) System.Runtime.InteropServices.Marshal.WriteByte(data, i, 0);
+            System.Runtime.InteropServices.Marshal.WriteInt32(data, 0, 0xA2);
+            onKey.Invoke(second, new object[] { 0, new IntPtr(0x101), data });
+            if (released != 1 || !(bool)hookType.GetProperty("TriggerHeld")!.GetValue(second)!) throw new Exception("Trigger must remain held when modifier releases first");
+            System.Runtime.InteropServices.Marshal.WriteInt32(data, 0, 0x78);
+            onKey.Invoke(second, new object[] { 0, new IntPtr(0x101), data });
+            if ((bool)hookType.GetProperty("TriggerHeld")!.GetValue(second)!) throw new Exception("Trigger release not recorded");
         }
         finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(data); }
     }

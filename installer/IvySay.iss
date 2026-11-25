@@ -21,3 +21,17 @@ Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cr
 Name: "{autoprograms}\Ivy Say"; Filename: "{app}\IvySay.exe"
 [Run]
 Filename: "{app}\IvySay.exe"; Description: "Launch Ivy Say"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Current: String;
+  Expected: String;
+begin
+  if CurUninstallStep = usUninstall then begin
+    Expected := '"' + ExpandConstant('{app}\IvySay.exe') + '" --startup';
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'IvySay', Current)
+       and (CompareText(Current, Expected) = 0) then
+      RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'IvySay');
+  end;
+end;

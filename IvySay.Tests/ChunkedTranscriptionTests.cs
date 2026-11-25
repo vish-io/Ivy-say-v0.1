@@ -44,6 +44,18 @@ public class ChunkedTranscriptionTests
         Assert.False(session.UsedFullRecordingFallback);
         Assert.Equal(2, calls);
     }
+    [Fact] public async Task LaterCorrectionIsJoinedWithEarlierStatement()
+    {
+        var pcm = Speech(16); Pause(pcm, 8);
+        int calls = 0;
+        var session = new ChunkedTranscription(14, 0, "", (_, _, _, _) =>
+            Task.FromResult(Interlocked.Increment(ref calls) == 1
+                ? "Send the report on Monday." : "Actually, send it on Tuesday."), CancellationToken.None);
+        session.Update(pcm);
+        string result = await session.FinishAsync(WavEncoder.Encode16KhzMono(pcm));
+        Assert.Equal("Send the report on Monday. Actually, send it on Tuesday.", result);
+        Assert.False(session.UsedFullRecordingFallback);
+    }
     [Fact] public async Task FailureRetriesOriginalAsWav()
     {
         var pcm = Speech(16); Pause(pcm, 8);

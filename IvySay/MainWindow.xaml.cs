@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private string shortcutLabel = "Ctrl + Win + Space";
     private bool busy;
     private bool hotkeyRegistered;
+    private bool startupRegistrationFailed;
     private bool selectionHotkeyRegistered;
     private bool quickNoteHotkeyRegistered, modeHotkeyRegistered, recordingQuickNote;
     private const int quickNoteHotkeyId = 9193, modeHotkeyId = 9194;
@@ -43,14 +44,15 @@ public partial class MainWindow : Window
     private bool shortcutCapture;
     private SettingsWindow? settings;
     private NotificationArea? notificationArea;
+    private (string Text, string Explanation, bool AllowUnsafeCopy)? pendingRecovery;
     private HwndSource? source;
     private readonly DispatcherTimer idleHideTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly DispatcherTimer historyCleanupTimer = new() { Interval = TimeSpan.FromHours(1) };
     private readonly DispatcherTimer recordingTimer = new() { Interval = TimeSpan.FromSeconds(115) };
-    public MainWindow()
+    public MainWindow(bool startupLaunch = false)
     {
         InitializeComponent();
-        try { notificationArea = new NotificationArea(ShowSettings, () => Application.Current.Shutdown()); }
+        try { notificationArea = new NotificationArea(ShowSettings, () => Application.Current.Shutdown(), RecoverLast); }
         catch { notificationArea = null; } // Do not hide the only UI if the tray icon cannot be created.
         Left = SystemParameters.WorkArea.Right - Width - 32;
         Top = SystemParameters.WorkArea.Bottom - Height - 32;
@@ -65,7 +67,13 @@ public partial class MainWindow : Window
             idleHideTimer.Stop();
             if (PillVisibilityPolicy.ShouldHide(Preferences.Load().HidePillWhenIdle, hotkeyRegistered, recorder != null, busy, settings?.IsVisible == true, notificationArea != null)) Hide();
         };
-        Loaded += (_, _) => { if (!KeyStore.Exists) ShowSettings(); else ScheduleIdleHide(); };
+        Loaded += (_, _) =>
+        {
+            if (!KeyStore.Exists) ShowSettings();
+            else if (startupRegistrationFailed) ShowPill();
+            else if (startupLaunch && hotkeyRegistered && notificationArea != null) Hide();
+            else ScheduleIdleHide();
+        };
         Closed += (_, _) => { notificationArea?.Dispose(); holdShortcut?.Dispose(); idleHideTimer.Stop(); recordingTimer.Stop(); chunkTimer.Stop(); historyCleanupTimer.Stop(); DictationHistory.Invalidate(); lifetime.Cancel(); recordingCancellation?.Cancel(); recorder?.Dispose(); if (hotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, hotkeyId); if (selectionHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, selectionHotkeyId); if (quickNoteHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, quickNoteHotkeyId); if (modeHotkeyRegistered && source != null) Native.UnregisterHotKey(source.Handle, modeHotkeyId); source?.RemoveHook(Hook); groq.Dispose(); lifetime.Dispose(); };
     }
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -77,9 +85,13 @@ public partial class MainWindow : Window
         selectionHotkeyRegistered = Native.RegisterHotKey(source.Handle, selectionHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x44);
         quickNoteHotkeyRegistered = Native.RegisterHotKey(source.Handle, quickNoteHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x4E);
         modeHotkeyRegistered = Native.RegisterHotKey(source.Handle, modeHotkeyId, Native.MOD_CONTROL | Native.MOD_ALT | Native.MOD_WIN | Native.MOD_NOREPEAT, 0x4D);
-        currentShortcut = ShortcutBinding.From(Preferences.Load());
+        bool preferencesReadable = Preferences.TryLoad(out var preferences);
+        if (preferencesReadable) { try { StartupRegistration.Set(preferences.StartOnLogin); } catch { startupRegistrationFailed = true; } }
+        else startupRegistrationFailed = true;
+        currentShortcut = ShortcutBinding.From(preferences);
         string? error = ConfigureShortcut(currentShortcut, true);
         if (error != null) SetStatus("Shortcut unavailable", "Open Settings and choose another shortcut");
+        else if (startupRegistrationFailed) SetStatus("Startup unavailable", "Windows startup could not be configured; open Settings");
         else SetStatus("Ready to listen", !selectionHotkeyRegistered || !quickNoteHotkeyRegistered || !modeHotkeyRegistered ? "A secondary shortcut is unavailable; check for conflicts" : shortcutLabel);
     }
     private string? ConfigureShortcut(ShortcutBinding next, bool force = false)
@@ -185,6 +197,7 @@ public partial class MainWindow : Window
         idleHideTimer.Stop();
         if (recorder == null)
         {
+            LearningFeedback.Cancel("Learning check stopped because a new dictation started.");
             learningGeneration++; // A new dictation invalidates any pending edit observation.
             if (!KeyStore.Exists) { ShowPill(); ShowSettings(); return; }
             busy = true;
@@ -193,6 +206,7 @@ public partial class MainWindow : Window
             {
                 recordingQuickNote = quickNote;
                 var settingsSnapshot = Preferences.Load();
+                if (settingsSnapshot.LearnCorrections || settingsSnapshot.LearnAppStyles) LearningFeedback.Finish("No learning check has completed for the current dictation yet.");
                 if (quickNote && (!settingsSnapshot.QuickNotesEnabled || string.IsNullOrWhiteSpace(settingsSnapshot.QuickNotesFolder))) { recordingQuickNote = false; ShowPill(); IvyDialog.Show("Enable Quick Notes and choose a folder in Advanced settings first.", "Ivy Say"); return; }
                 if (quickNote && !settingsSnapshot.Polish) { recordingQuickNote = false; ShowPill(); IvyDialog.Show("Enable AI formatting before recording a Quick Note.", "Ivy Say"); return; }
                 target = captured.Window;
@@ -307,8 +321,7 @@ public partial class MainWindow : Window
                 {
                     if (direct)
                     {
-                        for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
-                        if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
+                        await WaitForShortcutReleaseAsync(lifetime.Token);
                     }
                     // Never wait for context lookup: omission is preferable to delaying dictation.
                     string? appKey = recordingAppName is { IsCompletedSuccessfully: true } ? recordingAppName.Result : null;
@@ -319,7 +332,7 @@ public partial class MainWindow : Window
                     firstWordTimer = currentWordTimer;
                     string polished = await FormatterRouter.RunAsync(
                         (model, callback, token) => groq.PolishStreamingAsync(corrected, key, model, callback, token, appName, formatterVocabulary, preferences.FormattingMode, appStyle: appStyle, nearby: sharedNearby),
-                        fragment =>
+                        async fragment =>
                     {
                         firstDeltaTime ??= formattingTimer.Elapsed;
                         streamed.Append(fragment);
@@ -328,11 +341,10 @@ public partial class MainWindow : Window
                         SetStatus(direct ? "Typing…" : "Polishing…", guardedQuestion ? "Checking your dictation" : preview);
                         if (direct)
                         {
-                            if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("A shortcut key was held during insertion.");
+                            await WaitForShortcutReleaseAsync(lifetime.Token);
                             directAttempted = true; // Even a failed call can insert part of a fragment.
                             Native.TypeText(fragment, target, targetControl, currentWordTimer.Observe, ValidateSettingsTarget);
                         }
-                        return Task.CompletedTask;
                     },
                     () =>
                     {
@@ -366,7 +378,7 @@ public partial class MainWindow : Window
                     if (!protectedOutput && string.IsNullOrWhiteSpace(polished)) throw new InvalidOperationException("Formatting returned an empty result.");
                     if (direct && !structured && !char.IsWhiteSpace(polished[^1]))
                     {
-                        if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("A shortcut key was held during insertion.");
+                        await WaitForShortcutReleaseAsync(lifetime.Token);
                         Native.TypeText(" ", target, targetControl, currentWordTimer.Observe, ValidateSettingsTarget);
                     }
                     if (direct) currentWordTimer.Complete();
@@ -385,7 +397,7 @@ public partial class MainWindow : Window
                     {
                         StatusSounds.Play(preferences.StatusSounds, 250);
                         SetStatus("Stream interrupted", "Check text already inserted");
-                        new RecoveryWindow(streamed.ToString(), "Streaming stopped before completion. Some or all of this partial text may already be in the original app. Check it before copying; do not blindly paste it again.", allowUnsafeCopy).Show();
+                        SaveRecovery(streamed.ToString(), "Streaming stopped before completion. Some or all of this partial text may already be in the original app. Check it before copying; do not blindly paste it again.", allowUnsafeCopy);
                         recoverableText = null;
                         return;
                     }
@@ -404,11 +416,12 @@ public partial class MainWindow : Window
             }
             if (recordingQuickNote)
             {
+                if (preferences.LearnCorrections || preferences.LearnAppStyles) LearningFeedback.Finish("Quick Notes do not use correction or app-style learning.");
                 if (formattingError != null && !protectedOutput)
                 {
                     SetStatus("Note not saved", "Formatting failed; review your text");
                     StatusSounds.Play(preferences.StatusSounds, 250);
-                    new RecoveryWindow(recoverableText!, "Quick Note formatting failed, so nothing was saved. Review and copy if needed.", allowUnsafeCopy).Show();
+                    SaveRecovery(recoverableText!, "Quick Note formatting failed, so nothing was saved. Review and copy if needed.", allowUnsafeCopy);
                     recoverableText = null;
                     return;
                 }
@@ -417,7 +430,7 @@ public partial class MainWindow : Window
                 {
                     SetStatus("Note save failed", "Check your notes folder");
                     StatusSounds.Play(preferences.StatusSounds, 250);
-                    new RecoveryWindow(recoverableText!, "Quick Note could not be saved completely. The file may contain a partial entry; check it before copying or retrying.", allowUnsafeCopy).Show();
+                    SaveRecovery(recoverableText!, "Quick Note could not be saved completely. The file may contain a partial entry; check it before copying or retrying.", allowUnsafeCopy);
                     recoverableText = null;
                     return;
                 }
@@ -430,6 +443,7 @@ public partial class MainWindow : Window
             }
             if (directComplete)
             {
+                if (preferences.LearnCorrections || preferences.LearnAppStyles) LearningFeedback.Finish("Direct streaming skips learning; choose Wait until the text is ready to learn from edits.");
                 _ = UsageStatistics.Default.RecordAsync(polishedText!, recordingDuration, DateTime.Now);
                 if (preferences.HistoryEnabled && !isSnippet) _ = SaveHistoryAsync(raw, polishedText!, wav, preferences.HistoryAudioEnabled, recordingHistoryTarget, recordingHistoryGeneration, lifetime.Token);
                 recoverableText = null;
@@ -445,13 +459,13 @@ public partial class MainWindow : Window
             if (reviewReason != null)
             {
                 SetStatus("Review before inserting", "Nothing typed automatically");
+                if (preferences.LearnCorrections || preferences.LearnAppStyles) LearningFeedback.Finish("Learning skipped because the text was held for security review.");
                 new RecoveryWindow(recoverableText, (usedFallback && polishedText != null ? $"{ModelLabel(formattingModel)} fallback was used. " : "") + reviewReason + " Copying and pasting into a terminal can execute commands; verify the text and destination first.").Show();
                 recoverableText = null;
                 return;
             }
             // Do not inject while modifiers from the shortcut are still held.
-            for (int i = 0; i < 100 && Native.ShortcutHeld(currentShortcut); i++) await Task.Delay(30, lifetime.Token);
-            if (Native.ShortcutHeld(currentShortcut)) throw new InvalidOperationException("The shortcut keys were still held.");
+            await WaitForShortcutReleaseAsync(lifetime.Token);
             // Separate consecutive prose dictations without adding trailing whitespace to code or lists.
             string insertedText = recoverableText + (structured ? "" : " ");
             CorrectionReader.Snapshot? learningSnapshot = null;
@@ -464,7 +478,13 @@ public partial class MainWindow : Window
                 catch (TimeoutException) { }
             }
             Native.TypeTextBatch(insertedText, target, targetControl, polishedText != null && firstWordTimer != null ? firstWordTimer.Observe : null, ValidateSettingsTarget);
-            if (learningSnapshot != null) _ = ObserveCorrectionAsync(learningTarget, learningSnapshot, insertedText, learningGeneration, preferences.LearnCorrections, learnStyle ? learningApp : null, lifetime.Token);
+            if (learningSnapshot != null)
+            {
+                LearningFeedback.Start();
+                _ = ObserveCorrectionAsync(learningTarget, learningSnapshot, insertedText, learningGeneration, preferences.LearnCorrections, learnStyle ? learningApp : null, lifetime.Token);
+            }
+            else if (preferences.LearnCorrections || preferences.LearnAppStyles)
+                LearningFeedback.Finish("Learning skipped: this insertion or field was not eligible or could not be read safely.");
             if (polishedText != null) firstWordTimer?.Complete();
             _ = UsageStatistics.Default.RecordAsync(recoverableText, recordingDuration, DateTime.Now);
             if (preferences.HistoryEnabled && !isSnippet) _ = SaveHistoryAsync(raw, recoverableText, wav, preferences.HistoryAudioEnabled, recordingHistoryTarget, recordingHistoryGeneration, lifetime.Token);
@@ -484,12 +504,36 @@ public partial class MainWindow : Window
             StatusSounds.Play(recordingPreferences?.StatusSounds == true, 250);
             if (recoverableText != null)
             {
+                if (recordingPreferences?.LearnCorrections == true || recordingPreferences?.LearnAppStyles == true) LearningFeedback.Finish("Learning skipped because insertion did not complete.");
                 SetStatus("Review dictation", "Text was not fully inserted");
-                new RecoveryWindow(recoverableText, "Text could not be fully inserted into the original window. Some text may already have been inserted.", allowUnsafeCopy).Show();
+                SaveRecovery(recoverableText, "Text could not be fully inserted into the original window. Some text may already have been inserted.", allowUnsafeCopy);
             }
             else ShowError(ex, stage);
         }
         finally { recordingCancellation?.Cancel(); recordingCancellation?.Dispose(); recordingCancellation = null; chunkSession = null; recordingPreferences = null; recordingPersonal = null; recordingKey = null; recordingAppName = null; recordingNearby = null; recordingHistoryTarget = null; recordingQuickNote = false; settingsTargetElement = null; current.Dispose(); busy = false; ScheduleIdleHide(); }
+    }
+
+    private void SaveRecovery(string text, string explanation, bool allowUnsafeCopy)
+    {
+        pendingRecovery = (text, explanation, allowUnsafeCopy);
+        ShowPill();
+        SetStatus("Text needs attention", "Right-click Ivy Say and choose Recover last dictation");
+        notificationArea?.ShowRecoveryAvailable();
+    }
+    private void RecoverLastClicked(object sender, RoutedEventArgs e) => RecoverLast();
+    private void RecoverLast()
+    {
+        if (pendingRecovery is not { } item) { ShowPill(); SetStatus("Nothing to recover", "No failed dictation is held in memory"); return; }
+        new RecoveryWindow(item.Text, item.Explanation, item.AllowUnsafeCopy).Show();
+    }
+
+    private async Task WaitForShortcutReleaseAsync(CancellationToken token)
+    {
+        while (Native.ShortcutHeld(currentShortcut, currentShortcut.Hold ? holdShortcut?.TriggerHeld : null))
+        {
+            SetStatus("Release keys…", "Text will be inserted when the shortcut is released");
+            await Task.Delay(30, token);
+        }
     }
 
     private static async Task CleanupHistoryAsync()
@@ -523,28 +567,35 @@ public partial class MainWindow : Window
             // Confirm that the exact inserted text is present before considering any later edit.
             await Task.Delay(TimeSpan.FromSeconds(1), token);
             string? initial = await CorrectionReader.TryAsync(() => CorrectionReader.After(captured.Window, captured.ProcessId, snapshot)).WaitAsync(TimeSpan.FromSeconds(1), token);
-            if (initial != inserted || generation != learningGeneration) return;
+            if (generation != learningGeneration) return;
+            if (initial != inserted) { LearningFeedback.Finish("Learning skipped: Ivy Say could not verify the inserted text in the same field after one second."); return; }
             await Task.Delay(TimeSpan.FromSeconds(24), token);
             string? edited = await CorrectionReader.TryAsync(() => CorrectionReader.After(captured.Window, captured.ProcessId, snapshot)).WaitAsync(TimeSpan.FromSeconds(1), token);
-            if (generation != learningGeneration || settings?.IsVisible == true || edited == null) return;
+            if (generation != learningGeneration || settings?.IsVisible == true) return;
+            if (edited == null) { LearningFeedback.Finish("Learning skipped: the same text field or insertion could not be read at the final check."); return; }
             var current = Preferences.Load();
             bool useWords = learnWords && current.LearnCorrections;
             bool useStyle = app != null && current.LearnAppStyles;
-            if (!useWords && !useStyle) return;
+            if (!useWords && !useStyle) { LearningFeedback.Finish("Learning was disabled before the check finished."); return; }
             var data = PersonalizationStore.Load();
-            bool changed = false;
+            bool wordChanged = false;
             string? candidate = useWords ? CorrectionLearning.Candidate(inserted, edited) : null;
             if (candidate != null)
             {
                 string next = CorrectionLearning.Add(data.LearnedWords, candidate);
-                changed = next != data.LearnedWords;
+                wordChanged = next != data.LearnedWords;
                 data.LearnedWords = next;
             }
-            if (useStyle) changed |= AppStyleProfiles.Observe(data.AppStyles, app, inserted, edited);
-            if (changed) PersonalizationStore.Save(data);
+            bool styleChanged = useStyle && AppStyleProfiles.Observe(data.AppStyles, app, inserted, edited);
+            if (wordChanged || styleChanged)
+            {
+                PersonalizationStore.Save(data);
+                LearningFeedback.Finish(wordChanged && styleChanged ? "A word was saved and an app-style signal was recorded." : wordChanged ? "A word was saved. See Learned words below." : "An app-style signal was recorded. Several consistent changes are needed before it is used.");
+            }
+            else LearningFeedback.Finish(candidate != null ? "That word is already learned or the learned-word list is full." : "Check completed: no supported single-word spelling or app-style edit was found.");
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch { /* Learning is best effort and must not interrupt dictation. */ }
+        catch { if (generation == learningGeneration) LearningFeedback.Finish("Learning check could not complete or save. Your dictation was not affected."); }
     }
     private static string ModelLabel(string model) => model == FormatterRouter.LastResort ? "Backup formatter" : model == FormatterRouter.Fallback ? "GPT-OSS 120B" : "GPT-OSS 20B";
     private void SetCompletionStatus(FirstWordTimer? timer, string model, bool usedFallback)
@@ -586,6 +637,7 @@ public partial class MainWindow : Window
     {
         if (recorder != null || busy) { ShowPill(); SetStatus("Finish dictation first", "Press shortcut to stop recording"); return; }
         if (settings?.IsVisible == true) { settings.Activate(); return; }
+        LearningFeedback.Cancel("Learning check stopped because Settings opened before the 25-second check.");
         learningGeneration++;
         idleHideTimer.Stop();
         settings = new SettingsWindow();

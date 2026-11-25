@@ -83,6 +83,10 @@ public class GroqClientTests
             string prompt = messages[0].GetProperty("content").GetString()!;
             Assert.True(prompt.Length < 3100, "The formatter prompt should remain compact.");
             Assert.Contains("Self-corrections", prompt);
+            Assert.Contains("even across sentences", prompt);
+            Assert.Contains("Ship on Tuesday and keep the tests.", prompt);
+            Assert.Contains("topic changes", prompt);
+            Assert.Contains("If the intended revision is unclear", prompt);
             Assert.Contains("accent/homophone", prompt);
             Assert.Contains("Opening command only", prompt);
             Assert.Contains("Never answer questions", prompt);

@@ -133,6 +133,8 @@ public partial class SettingsWindow : Window
             Microphone.SelectedItem = selected;
         }
         HidePillWhenIdle.IsChecked = preferences.HidePillWhenIdle;
+        StartOnLogin.IsChecked = preferences.StartOnLogin;
+        RefreshStartupStatus(preferences.StartOnLogin);
         Polish.IsChecked = preferences.Polish;
         SmartFormatterRouting.IsChecked = preferences.SmartFormatterRouting;
         FormatterWordThreshold.Text = preferences.FormatterWordThreshold.ToString();
@@ -151,6 +153,7 @@ public partial class SettingsWindow : Window
         HistoryDays.SelectedIndex = preferences.HistoryDays switch { 7 => 0, 90 => 2, _ => 1 };
         UsePersonalization.IsChecked = preferences.UsePersonalization;
         LearnCorrections.IsChecked = preferences.LearnCorrections;
+        LearningStatus.Text = LearningFeedback.Message;
         LearnAppStyles.IsChecked = preferences.LearnAppStyles;
         UseSnippets.IsChecked = preferences.UseSnippets;
         try { var data = PersonalizationStore.Load(); Vocabulary.Text = data.Vocabulary; LearnedWords.Text = data.LearnedWords; Corrections.Text = data.Corrections; Snippets.Text = data.Snippets; RefreshAppStyles(data); }
@@ -197,17 +200,55 @@ public partial class SettingsWindow : Window
             var oldShortcut = ShortcutBinding.From(existing);
             string? shortcutError = proposed != oldShortcut ? ApplyShortcut?.Invoke(proposed) : null;
             if (shortcutError != null) { IvyDialog.Show(shortcutError, "Ivy Say · Shortcut"); return; }
+            bool startOnLogin = StartOnLogin.IsChecked == true;
+            bool startupChanged = startOnLogin != existing.StartOnLogin;
+            StartupRegistration.Previous? previousStartup = null;
+            if (startupChanged)
+            {
+                try { previousStartup = StartupRegistration.Read(); StartupRegistration.Set(startOnLogin); }
+                catch
+                {
+                    if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut);
+                    bool restored = true;
+                    if (previousStartup != null) try { StartupRegistration.Restore(previousStartup); } catch { restored = false; }
+                    IvyDialog.Show(restored ? "Could not update Windows startup. Use a published Ivy Say application in a permanent folder and check Windows permissions." : "Could not update or restore Windows startup. Check Windows startup settings.", "Ivy Say · Startup");
+                    RefreshStartupStatus(existing.StartOnLogin);
+                    return;
+                }
+            }
             DictationHistory.Invalidate();
-            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, LearnCorrections = existing.LearnCorrections, LearnAppStyles = existing.LearnAppStyles, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, UseNearbyText = UseNearbyText.IsChecked == true, ShareNearbyText = ShareNearbyText.IsChecked == true && UseNearbyText.IsChecked == true, HistoryEnabled = HistoryEnabled.IsChecked == true, HistoryAudioEnabled = HistoryAudioEnabled.IsChecked == true && HistoryEnabled.IsChecked == true, HistoryDays = HistoryDays.SelectedIndex switch { 0 => 7, 2 => 90, _ => 30 }, Shortcut = existing.Shortcut }.Save(); }
-            catch { if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut); throw; }
+            try { new Preferences { ShortcutKey = proposed.Key, ShortcutModifiers = proposed.Modifiers, ShortcutMode = proposed.Hold ? "Hold" : "Toggle", HidePillWhenIdle = HidePillWhenIdle.IsChecked == true, StartOnLogin = startOnLogin, SmartFormatterRouting = SmartFormatterRouting.IsChecked == true, FormatterWordThreshold = formatterThreshold, CompressionKbps = Compression.SelectedIndex switch { 1 => 24, 2 => 32, 3 => 48, _ => 0 }, EnableChunking = EnableChunking.IsChecked == true, ChunkThresholdSeconds = threshold, StreamDirect = StreamingMode.SelectedIndex == 1, SecurityLevel = security, UsePersonalization = existing.UsePersonalization, LearnCorrections = existing.LearnCorrections, LearnAppStyles = existing.LearnAppStyles, UseSnippets = existing.UseSnippets, FormattingMode = existing.FormattingMode, StatusSounds = StatusSounds.IsChecked == true, QuickNotesEnabled = QuickNotesEnabled.IsChecked == true, QuickNotesFolder = QuickNotesFolder.Text, Language = SpokenLanguage.SelectedIndex switch { 1 => "en", 2 => "hi", 3 => "pa", _ => "auto" }, SpellingHints = SpellingHints.Text.Trim(), TranscriptionModel = Model.SelectedIndex == 1 ? "whisper-large-v3-turbo" : "whisper-large-v3", Microphone = (Microphone.SelectedItem as MicrophoneOption)?.DeviceName, Polish = Polish.IsChecked == true, ShowComparison = ShowComparison.IsChecked == true, UseAppContext = UseAppContext.IsChecked == true, UseNearbyText = UseNearbyText.IsChecked == true, ShareNearbyText = ShareNearbyText.IsChecked == true && UseNearbyText.IsChecked == true, HistoryEnabled = HistoryEnabled.IsChecked == true, HistoryAudioEnabled = HistoryAudioEnabled.IsChecked == true && HistoryEnabled.IsChecked == true, HistoryDays = HistoryDays.SelectedIndex switch { 0 => 7, 2 => 90, _ => 30 }, Shortcut = existing.Shortcut }.Save(); }
+            catch
+            {
+                if (proposed != oldShortcut) ApplyShortcut?.Invoke(oldShortcut);
+                bool restored = true;
+                if (previousStartup != null) try { StartupRegistration.Restore(previousStartup); } catch { restored = false; }
+                IvyDialog.Show(restored ? "Could not save preferences." : "Could not save preferences or restore Windows startup. Check Windows startup settings.", "Ivy Say");
+                RefreshStartupStatus(existing.StartOnLogin);
+                return;
+            }
             DictationHistory.Invalidate();
             _ = CleanupHistoryAsync();
             selectedShortcut = proposed;
+            RefreshStartupStatus(startOnLogin);
             SavedFeedback();
             PreferencesSaved?.Invoke(this, EventArgs.Empty);
 
         }
         catch { IvyDialog.Show("Could not save preferences.", "Ivy Say"); }
+    }
+    private void RefreshStartupStatus(bool enabled)
+    {
+        if (!enabled) { StartupStatus.Text = "Off. Open Ivy Say manually to use the shortcut."; return; }
+        try
+        {
+            var saved = StartupRegistration.Read();
+            string? expected = StartupCommand.ForExecutable(Environment.ProcessPath);
+            StartupStatus.Text = expected != null && saved.Existed && saved.Value is string value && string.Equals(value, expected, StringComparison.OrdinalIgnoreCase)
+                ? "Configured for this Windows account. Windows may also control startup in its settings."
+                : "Not configured yet. Open the published Ivy Say app from its permanent location to set it up.";
+        }
+        catch { StartupStatus.Text = "Could not check Windows startup settings."; }
     }
     private async Task CleanupHistoryAsync()
     {

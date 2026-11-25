@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 namespace IvySay;
 public partial class RecoveryWindow : Window
 {
@@ -8,7 +9,7 @@ public partial class RecoveryWindow : Window
         this.allowUnsafeCopy = allowUnsafeCopy;
         InitializeComponent();
         ResultText.Text = text;
-        Explanation.Text = explanation + " Review or copy it below. This text is not saved by Ivy Say and will be lost when you close this window.";
+        Explanation.Text = explanation + " Review or copy it below. This window does not save text. A recovered failure stays in memory until replaced or Ivy Say exits.";
     }
     private void CopyText(object sender, RoutedEventArgs e)
     {
@@ -17,5 +18,6 @@ public partial class RecoveryWindow : Window
         try { Clipboard.SetText(ResultText.Text); }
         catch (System.Runtime.InteropServices.ExternalException) { IvyDialog.Show("The clipboard is busy. Please try again.", "Ivy Say"); }
     }
+    private void DragHeader(object sender, MouseButtonEventArgs e) { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); }
     private void CloseWindow(object sender, RoutedEventArgs e) => Close();
 }

@@ -17,16 +17,17 @@ public partial class ComparisonWindow : Window
         PersonalLabel.Text = personalized ? "2 · After your local corrections" : "2 · Local corrections disabled";
         if (polished != null)
         {
-            OutputLabel.Text = "3 · AI formatter output (inserted)";
+            OutputLabel.Text = "3 · AI formatter output (sent to app)";
             OutputText.Text = polished;
             Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · {formattingModel}{(usedFallback ? " (fallback; times include first attempt)" : " (selected)")}: first text: {firstDeltaTime!.Value.TotalSeconds:F2}s · AI total: {formattingTime!.Value.TotalSeconds:F2}s · routing: {routingReason}. The model may return text unchanged when no edit is needed.";
         }
         else
         {
-            OutputLabel.Text = "3 · No AI output (stage 2 inserted)";
+            OutputLabel.Text = "3 · No AI output (stage 2 sent to app)";
             OutputText.Text = corrected;
             Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · " + (polishEnabled ? $"{(usedFallback ? $"{formattingModel} fallback failed" : "Formatting failed")}: {error ?? "unknown error"}." : "AI formatting is disabled in settings.");
         }
+        Summary.Text += "\nCompare this output with the target app; Windows accepting input does not guarantee it was entered correctly.";
         Summary.Text += $"\nInput: {microphone} · {AudioSignal.Measure(wav.AsSpan(44)).Description}. Playback is the original WAV, before any optional compression.";
     }
     private void PlayAudio(object sender, RoutedEventArgs e)

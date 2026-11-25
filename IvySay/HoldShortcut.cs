@@ -17,6 +17,8 @@ internal sealed class HoldShortcut : IDisposable
     private readonly HookProc callback;
     private IntPtr hook;
     private bool down, suppressTrigger;
+    // Hook events are authoritative for this consumed key, including after a modifier release.
+    public bool TriggerHeld => suppressTrigger;
     public HoldShortcut(ShortcutBinding binding, Func<bool> canStart, Action pressed, Action released)
     {
         this.binding = binding; this.canStart = canStart; this.pressed = pressed; this.released = released;
