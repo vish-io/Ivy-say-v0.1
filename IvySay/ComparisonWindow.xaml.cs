@@ -7,7 +7,7 @@ public partial class ComparisonWindow : Window
     private byte[]? capturedWav;
     private WaveOutEvent? player;
     private WaveFileReader? reader;
-    public ComparisonWindow(string raw, string corrected, string? polished, string model, TimeSpan transcriptionTime, TimeSpan? formattingTime, TimeSpan? firstDeltaTime, string? error, string formattingModel, bool usedFallback, bool polishEnabled, bool personalized, byte[] wav, string microphone, string routingReason)
+    public ComparisonWindow(string raw, string corrected, string? polished, string model, TimeSpan transcriptionTime, TimeSpan? formattingTime, TimeSpan? firstDeltaTime, string? error, string formattingModel, bool usedFallback, bool polishEnabled, bool personalized, byte[] wav, string microphone, string routingReason, string? rejectedFirst = null, string? rejectedRetry = null)
     {
         InitializeComponent();
         capturedWav = wav;
@@ -26,6 +26,12 @@ public partial class ComparisonWindow : Window
             OutputLabel.Text = "3 · No AI output (stage 2 sent to app)";
             OutputText.Text = corrected;
             Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · " + (polishEnabled ? $"{formattingModel}{(usedFallback ? " (fallback attempted)" : " (selected)")} · routing: {routingReason} · Formatting not used: {error ?? "unknown error"}." : "AI formatting is disabled in settings.");
+        }
+        if (rejectedFirst != null)
+        {
+            RejectedDrafts.Visibility = Visibility.Visible;
+            FirstRejected.Text = rejectedFirst;
+            RetryRejected.Text = rejectedRetry ?? "Retry did not produce a draft.";
         }
         Summary.Text += "\nCompare this output with the target app; Windows accepting input does not guarantee it was entered correctly.";
         Summary.Text += $"\nInput: {microphone} · {AudioSignal.Measure(wav.AsSpan(44)).Description}. Playback is the original WAV, before any optional compression.";

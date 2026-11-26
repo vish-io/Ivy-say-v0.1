@@ -295,6 +295,7 @@ public partial class MainWindow : Window
             TimeSpan? formattingTime = null;
             TimeSpan? firstDeltaTime = null;
             string? polishedText = null;
+            string? rejectedFirst = null, rejectedRetry = null;
             if (raw.Length == 0) { StatusSounds.Play(preferences.StatusSounds, 250); SetStatus("Nothing heard", "Try speaking a little louder"); return; }
             string corrected = preferences.UsePersonalization ? PersonalizationRules.Parse(personal.Corrections).Apply(raw) : raw;
             string? expansion = null;
@@ -360,15 +361,18 @@ public partial class MainWindow : Window
                             streamed.Clear();
                             firstDeltaTime = null;
                             SetStatus("Checking dictation…", "Refining your words");
-                            return await groq.PolishStreamingAsync(corrected, key, formattingModel, fragment =>
+                            string retryDraft = await groq.PolishStreamingAsync(corrected, key, formattingModel, fragment =>
                             {
                                 firstDeltaTime ??= formattingTimer.Elapsed;
                                 return Task.CompletedTask;
                             }, token, appName, formatterVocabulary, preferences.FormattingMode, strict: true, appStyle: appStyle, nearby: sharedNearby);
+                            if (preferences.ShowComparison) rejectedRetry = retryDraft;
+                            return retryDraft;
                         }, lifetime.Token);
                         if (checkedResult.Rejected)
                         {
                             protectedOutput = true;
+                            if (preferences.ShowComparison) rejectedFirst = polished;
                             formattingError = "Formatter output rejected; dictated text preserved. " + checkedResult.Reason;
                             recoverableText = DictationGuard.SafeText(corrected);
                         }
@@ -450,7 +454,7 @@ public partial class MainWindow : Window
                 SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
                 StatusSounds.Play(preferences.StatusSounds, 900);
                 if (preferences.ShowComparison)
-                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, ModelLabel(formattingModel), usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
+                    new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, ModelLabel(formattingModel), usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason, rejectedFirst, rejectedFirst != null ? rejectedRetry : null).Show();
                 return;
             }
             // In unrestricted mode, skip the extra process lookup and optional review checks.
@@ -496,7 +500,7 @@ public partial class MainWindow : Window
             else if (polishedText != null) SetCompletionStatus(firstWordTimer, formattingModel, usedFallback);
             else SetStatus(preferences.UsePersonalization ? "Personalized text" : "Raw mode", shortcutLabel);
             if (preferences.ShowComparison)
-                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, ModelLabel(formattingModel), usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason).Show();
+                new ComparisonWindow(raw, corrected, polishedText, preferences.TranscriptionModel + (chunkSession!.UsedFullRecordingFallback ? " · full WAV retry" : chunkSession.ChunkCount > 0 ? " · chunked" : " · full recording"), transcriptionTimer.Elapsed, formattingTime, firstDeltaTime, formattingError, ModelLabel(formattingModel), usedFallback, preferences.Polish && !isSnippet, preferences.UsePersonalization, wav, preferences.Microphone ?? "Windows default (may change after restart)", formatterChoice.Reason, rejectedFirst, rejectedFirst != null ? rejectedRetry : null).Show();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)

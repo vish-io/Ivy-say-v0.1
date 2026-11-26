@@ -9,7 +9,18 @@
     <TextBox x:Name="PersonalText" Grid.Row="5" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10" FontSize="14"/>
     <TextBlock x:Name="OutputLabel" Grid.Row="6" FontWeight="SemiBold" Margin="0,14,0,6"/>
     <TextBox x:Name="OutputText" Grid.Row="7" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="10" FontSize="14"/>
-    <TextBlock Grid.Row="8" Text="Playback uses your speakers. This window keeps audio in memory until closed; optional encrypted history can save it if enabled." TextWrapping="Wrap" Foreground="#65746c" Margin="0,12,0,0"/>
+    <StackPanel Grid.Row="8" Margin="0,12,0,0">
+      <Expander x:Name="RejectedDrafts" Header="View rejected drafts (not inserted)" Visibility="Collapsed">
+        <StackPanel>
+          <TextBlock Text="These untrusted drafts were rejected, not inserted or saved in history. Review carefully." TextWrapping="Wrap" Margin="0,6,0,4"/>
+          <TextBlock Text="First draft" FontWeight="SemiBold"/>
+          <TextBox x:Name="FirstRejected" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxHeight="80"/>
+          <TextBlock Text="Retry draft" FontWeight="SemiBold" Margin="0,6,0,0"/>
+          <TextBox x:Name="RetryRejected" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxHeight="80"/>
+        </StackPanel>
+      </Expander>
+      <TextBlock Text="Playback uses your speakers. This window keeps audio in memory until closed; optional encrypted history can save it if enabled." TextWrapping="Wrap" Foreground="#65746c"/>
+    </StackPanel>
     <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,14,0,0">
       <Button Content="Play captured audio" Click="PlayAudio"/>
       <Button Content="Stop playback" Click="StopAudio" Margin="8,0,0,0"/>
