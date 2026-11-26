@@ -36,6 +36,21 @@ public class FormatterFidelityTests
         var failed = await FormatterFidelity.CheckAsync("what day is it", "Today is Monday", "clean", _ => throw new HttpRequestException(), CancellationToken.None);
         Assert.True(failed.Rejected); Assert.Null(failed.Text);
     }
+    [Fact] public async Task ReportsNegationFlagAndAcceptsAConservativeRetry()
+    {
+        const string input = "Invite the team Thursday. Thursday won't work, so move it to Friday.";
+        const string first = "Invite the team Friday.";
+        const string second = "Invite the team Friday because Thursday won't work.";
+        Assert.Equal("Negation missing from output", FormatterFidelity.SuspicionReason(input, first, "clean"));
+        var accepted = await FormatterFidelity.CheckAsync(input, first, "clean", _ => Task.FromResult(second), CancellationToken.None);
+        Assert.False(accepted.Rejected); Assert.Equal(second, accepted.Text);
+        var rejected = await FormatterFidelity.CheckAsync(input, first, "clean", _ => Task.FromResult(first), CancellationToken.None);
+        Assert.True(rejected.Rejected); Assert.Contains("Negation missing from output", rejected.Reason);
+    }
+    [Fact] public void NegationGuardRemainsInPlaceForDangerousOmissions()
+    {
+        Assert.Equal("Negation missing from output", FormatterFidelity.SuspicionReason("Do not send the money", "Send the money.", "clean"));
+    }
     [Fact] public async Task CancellationIsNotSwallowed()
     {
         using var cts = new CancellationTokenSource();

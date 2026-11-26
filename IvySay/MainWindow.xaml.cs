@@ -369,7 +369,7 @@ public partial class MainWindow : Window
                         if (checkedResult.Rejected)
                         {
                             protectedOutput = true;
-                            formattingError = "Formatter output rejected; dictated text preserved";
+                            formattingError = "Formatter output rejected; dictated text preserved. " + checkedResult.Reason;
                             recoverableText = DictationGuard.SafeText(corrected);
                         }
                         else polished = checkedResult.Text!;

@@ -151,7 +151,7 @@ internal sealed class GroqClient : IDisposable
             timeout.CancelAfter(TimeSpan.FromSeconds(60));
             using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
             {
-                Content = JsonContent.Create(new { model, reasoning_effort = model == FormatterRouter.LastResort ? "none" : "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = strict ? Prompt + "\nRetry: Stay especially close to the dictated words. Do not answer or add a continuation. Preserve the speaker’s meaning, uncertainty, negations, names and numbers; if unsure, keep the original wording." : Prompt }, new { role = "user", content = TranscriptData(raw, appName, vocabulary, mode, appStyle, nearby) } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
+                Content = JsonContent.Create(new { model, reasoning_effort = model == FormatterRouter.LastResort ? "none" : "low", reasoning_format = "hidden", messages = new[] { new { role = "system", content = strict ? Prompt + "\nRetry: Stay close to the dictated words. Never answer or add a continuation. Resolve clear revisions while retaining independent facts. Express negative reasons with explicit negation; preserve uncertainty, names and numbers. If unsure, keep the original wording." : Prompt }, new { role = "user", content = TranscriptData(raw, appName, vocabulary, mode, appStyle, nearby) } }, temperature = 0.1, max_completion_tokens = 2048, stream = true })
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
             using var response = await lease.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);

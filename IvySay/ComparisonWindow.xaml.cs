@@ -25,7 +25,7 @@ public partial class ComparisonWindow : Window
         {
             OutputLabel.Text = "3 · No AI output (stage 2 sent to app)";
             OutputText.Text = corrected;
-            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · " + (polishEnabled ? $"{(usedFallback ? $"{formattingModel} fallback failed" : "Formatting failed")}: {error ?? "unknown error"}." : "AI formatting is disabled in settings.");
+            Summary.Text = $"{model}: {transcriptionTime.TotalSeconds:F2}s · " + (polishEnabled ? $"{formattingModel}{(usedFallback ? " (fallback attempted)" : " (selected)")} · routing: {routingReason} · Formatting not used: {error ?? "unknown error"}." : "AI formatting is disabled in settings.");
         }
         Summary.Text += "\nCompare this output with the target app; Windows accepting input does not guarantee it was entered correctly.";
         Summary.Text += $"\nInput: {microphone} · {AudioSignal.Measure(wav.AsSpan(44)).Description}. Playback is the original WAV, before any optional compression.";
